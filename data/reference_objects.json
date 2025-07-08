@@ -1,0 +1,168 @@
+{
+  "earphone_case": {
+    "name": "이어폰 케이스",
+    "type": "rectangular",
+    "width": 5.0,
+    "height": 5.0,
+    "thickness": 2.5,
+    "area": 25.0,
+    "volume": 62.5,
+    "weight": 100.0,
+    "description": "사용자의 이어폰 케이스",
+    "accuracy": 0.95,
+    "common_variations": {}
+  },
+  "card": {
+    "name": "카드",
+    "type": "rectangular",
+    "width": 8.56,
+    "height": 5.39,
+    "thickness": 0.08,
+    "area": 46.1,
+    "volume": 3.69,
+    "weight": 5.0,
+    "description": "표준 신용카드/체크카드",
+    "accuracy": 0.98,
+    "common_variations": {
+      "명함": {
+        "width": 9.0,
+        "height": 5.0,
+        "thickness": 0.03
+      },
+      "교통카드": {
+        "width": 8.56,
+        "height": 5.39,
+        "thickness": 0.12
+      }
+    }
+  },
+  "spoon": {
+    "name": "숟가락",
+    "type": "elongated",
+    "length": 18.0,
+    "width": 3.0,
+    "thickness": 0.5,
+    "weight": 25.0,
+    "description": "표준 식탁용 숟가락",
+    "accuracy": 0.80,
+    "common_variations": {
+      "티스푼": {
+        "length": 14.0,
+        "width": 2.5,
+        "thickness": 0.4
+      },
+      "국물스푼": {
+        "length": 20.0,
+        "width": 3.5,
+        "thickness": 0.6
+      }
+    }
+  },
+  "chopsticks": {
+    "name": "젓가락",
+    "type": "elongated",
+    "length": 23.0,
+    "width": 0.8,
+    "thickness": 0.8,
+    "weight": 15.0,
+    "description": "표준 나무젓가락",
+    "accuracy": 0.75,
+    "common_variations": {
+      "금속젓가락": {
+        "length": 22.0,
+        "width": 0.6,
+        "thickness": 0.4
+      },
+      "일회용젓가락": {
+        "length": 20.0,
+        "width": 0.7,
+        "thickness": 0.7
+      }
+    }
+  },
+  "fork": {
+    "name": "포크",
+    "type": "elongated",
+    "length": 18.0,
+    "width": 2.5,
+    "thickness": 0.3,
+    "weight": 30.0,
+    "description": "표준 식탁용 포크",
+    "accuracy": 0.80,
+    "common_variations": {
+      "디저트포크": {
+        "length": 15.0,
+        "width": 2.0,
+        "thickness": 0.25
+      },
+      "샐러드포크": {
+        "length": 16.0,
+        "width": 2.2,
+        "thickness": 0.28
+      }
+    }
+  },
+  "smartphone": {
+    "name": "스마트폰",
+    "type": "rectangular",
+    "width": 7.5,
+    "height": 15.0,
+    "thickness": 0.8,
+    "area": 112.5,
+    "volume": 90.0,
+    "weight": 170.0,
+    "description": "표준 스마트폰",
+    "accuracy": 0.70,
+    "common_variations": {
+      "아이폰": {
+        "width": 7.1,
+        "height": 14.7,
+        "thickness": 0.78
+      },
+      "갤럭시": {
+        "width": 7.6,
+        "height": 15.9,
+        "thickness": 0.89
+      }
+    }
+  },
+  "pencil": {
+    "name": "연필",
+    "type": "cylindrical",
+    "length": 17.5,
+    "diameter": 0.7,
+    "area": 0.38,
+    "weight": 4.0,
+    "description": "표준 HB 연필",
+    "accuracy": 0.85,
+    "common_variations": {
+      "색연필": {
+        "length": 17.5,
+        "diameter": 0.8
+      },
+      "볼펜": {
+        "length": 14.0,
+        "diameter": 0.6
+      }
+    }
+  },
+  "lighter": {
+    "name": "라이터",
+    "type": "rectangular",
+    "width": 2.5,
+    "height": 8.0,
+    "thickness": 1.2,
+    "area": 20.0,
+    "volume": 24.0,
+    "weight": 18.0,
+    "description": "일회용 라이터",
+    "accuracy": 0.85,
+    "common_variations": {
+      "금속라이터": {
+        "width": 3.0,
+        "height": 5.5,
+        "thickness": 1.0
+      }
+    }
+  }
+} 

@@ -1,0 +1,322 @@
+# 🔒 보안 및 개인정보
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.key
+*.pem
+config.json
+secrets.json
+
+# 🤖 AI 모델 파일들 (대용량) - Git LFS로 관리
+# *.pt 파일은 Git LFS로 추적하므로 제외하지 않음
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+models/downloads/
+models/cache/
+models/pretrained/
+
+# 📊 결과 파일들 (자동 생성)
+results/
+outputs/
+predictions/
+visualizations/
+experiments/
+
+# 📋 로그 파일들
+logs/
+*.log
+*.log.*
+log/
+logging/
+
+# 🐍 Python 관련
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 🧪 테스트 관련
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# 🔧 가상환경
+venv/
+env/
+.venv/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
+# 🎯 Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# 🖥️ 운영체제 관련
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon*
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# 🛠️ 에디터 및 IDE
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# 📁 임시 파일들
+tmp/
+temp/
+.tmp/
+.temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*.rej
+
+# 🔄 캐시 파일들
+.cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.bandit
+.coverage
+.coverage.*
+
+# 📦 패키지 관리
+pip-log.txt
+pip-delete-this-directory.txt
+.pip-cache/
+.pip/
+Pipfile.lock
+poetry.lock
+yarn.lock
+package-lock.json
+
+# 📸 데이터 파일들 (개인 테스트 이미지 제외)
+# 개인 테스트 이미지들은 추가하지 않음
+data/personal/
+data/private/
+data/test_images/
+data/large_datasets/
+*.jpg.bak
+*.png.bak
+*.jpeg.bak
+
+# 📸 특정 이미지 제외 (샘플 이미지는 포함)
+# 20250701로 시작하는 이미지들 제외 (개인 촬영 이미지)
+data/20250701_*.jpg
+data/noref*.jpg
+data/test3.jpg
+data/test4.jpg
+# test1.jpg와 test5.jpg는 샘플로 포함
+# reference_objects.json은 중요한 설정 파일이므로 포함
+
+# 📄 대용량 데이터 파일들 제외
+# 식품의약품안전처 데이터 등 대용량 CSV 파일들
+*통합식품영양성분정보*.csv
+*식품의약품안전처*.csv
+# 다른 대용량 데이터 파일들
+*.csv
+!data/small_sample.csv  # 작은 샘플 CSV는 포함 가능
+dataset/
+datasets/
+*.xlsx
+*.xls
+
+# 🎨 미디어 파일들 (대용량)
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.wmv
+*.flv
+*.webm
+*.m4v
+
+# 📈 성능 및 프로파일링
+*.prof
+*.lprof
+.prof/
+profile_output/
+profiling/
+
+# 🔍 디버깅 파일들
+*.dmp
+*.stackdump
+core
+core.*
+*.core
+
+# 📊 통계 및 분석
+*.stats
+*.analysis
+*.report
+analysis/
+statistics/
+
+# 🧮 수치 계산
+*.npy
+*.npz
+*.mat
+*.h5
+*.hdf5
+
+# 🌐 웹 관련
+node_modules/
+*.min.js
+*.min.css
+bundle.js
+bundle.css
+
+# 📱 모바일 앱
+*.app
+*.ipa
+*.apk
+*.aab
+
+# 🏗️ 빌드 관련
+build/
+dist/
+*.spec
+*.manifest
+
+# 🚀 배포 관련
+deploy/
+deployment/
+.deploy/
+*.tar.gz
+*.zip
+*.7z
+*.rar
+
+# 📋 문서 생성
+docs/_build/
+docs/build/
+site/
+_site/
+
+# 🧹 기타 불필요한 파일들
+*.pid
+*.seed
+*.pid.lock
+.npm/
+.yarn/
+.pnp.*
+.eslintcache
+.stylelintcache
+.cache
+.parcel-cache
+.next/
+.nuxt/
+.svelte-kit/
+
+# 🔄 Git 관련
+*.orig
+*.rej
+*.patch
+.git/
+.gitconfig
+
+# 🏷️ 태그 파일들
+tags
+TAGS
+.tags
+.TAGS
+
+# 🔐 보안 스캔
+.bandit
+.safety
+.semgrep.yml
