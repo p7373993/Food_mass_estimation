@@ -703,7 +703,19 @@ class LLMMassEstimator:
         try:
             system_prompt = self._get_system_prompt()
             full_prompt = f"{system_prompt}\n\n{prompt}"
-            response = self.model.generate_content(full_prompt)
+            
+            # 일정한 답이 나오도록 temperature를 0으로 설정
+            generation_config = genai.types.GenerationConfig(
+                temperature=0,
+                top_p=1,
+                top_k=1,
+                max_output_tokens=1000,
+            )
+            
+            response = self.model.generate_content(
+                full_prompt,
+                generation_config=generation_config
+            )
             return response.text
         except Exception as e:
             logging.error(f"Gemini 텍스트 호출 오류: {e}")
@@ -719,9 +731,20 @@ class LLMMassEstimator:
             system_prompt = self._get_multimodal_system_prompt()
             full_prompt = f"{system_prompt}\n\n{prompt}"
             
+            # 일정한 답이 나오도록 temperature를 0으로 설정
+            generation_config = genai.types.GenerationConfig(
+                temperature=0,
+                top_p=1,
+                top_k=1,
+                max_output_tokens=1000,
+            )
+            
             # 멀티모달 모델 호출
             multimodal_model = genai.GenerativeModel(self.multimodal_model)
-            response = multimodal_model.generate_content([full_prompt, image])
+            response = multimodal_model.generate_content(
+                [full_prompt, image],
+                generation_config=generation_config
+            )
             return response.text
         except Exception as e:
             logging.error(f"Gemini 멀티모달 호출 오류: {e}")
@@ -736,7 +759,7 @@ class LLMMassEstimator:
                     {"role": "system", "content": self._get_system_prompt()},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.3,
+                temperature=0,  # 일정한 답이 나오도록 0으로 설정
                 max_tokens=1000
             )
             return response.choices[0].message.content
@@ -767,7 +790,7 @@ class LLMMassEstimator:
                         ]
                     }
                 ],
-                temperature=0.3,
+                temperature=0,  # 일정한 답이 나오도록 0으로 설정
                 max_tokens=1000
             )
             return response.choices[0].message.content
