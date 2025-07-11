@@ -1,73 +1,64 @@
-import torch
-from ultralytics import YOLO
+import logging
 import cv2
 import numpy as np
-from typing import Dict, List, Tuple, Optional
-import logging
+import torch
+from pathlib import Path
 from PIL import Image, ImageOps
-from pipeline.config import Config
+from ultralytics import YOLO
+from typing import Dict, Tuple, List
 
-class YOLOSegmentationModel:
+# 프로젝트 루트를 기준으로 config.settings를 임포트
+from config.settings import settings
+from utils.base_model import BaseModel
+
+class YOLOSegmentationModel(BaseModel):
     """
-    YOLO 세그멘테이션 모델을 사용하여 음식과 기준 물체를 분할하는 클래스
+    YOLOv8 분할 모델을 관리하는 래퍼 클래스.
+    - BaseModel을 상속받아 싱글톤 패턴과 공통 로직 사용
+    - 중앙 설정 파일(settings)을 사용합니다.
+    - 기존의 결과 파싱 및 시각화 기능을 유지합니다.
     """
     
-    def __init__(self, model_path: str = "yolo_food.pt"):
-        """
-        YOLO 모델 초기화
-        
-        Args:
-            model_path: 파인튜닝된 YOLO 모델 경로
-        """
-        self.model_path = model_path
-        self.model = None
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        
-        # 클래스 매핑 (단순화)
-        # 0: 음식, 1: 기준물체(이어폰 케이스)
+    def __init__(self):
         self.class_mapping = {
             0: "food",
-            1: "earphone_case"
+            1: "earphone_case" 
         }
-        
-        self.load_model()
+        super().__init__()
     
-    def load_model(self):
-        """모델 로드"""
+    def get_model_name(self) -> str:
+        return "YOLO 세그멘테이션 모델"
+    
+    def _initialize_model(self) -> None:
+        """YOLO 모델 초기화"""
         try:
-            self.model = YOLO(self.model_path)
-            self.model.to(self.device)
-            # 간단 디버그 모드에서 verbose 비활성화
-            if hasattr(Config, 'SIMPLE_DEBUG') and Config.SIMPLE_DEBUG:
-                self.model.verbose = False
-            logging.info(f"YOLO 모델이 성공적으로 로드되었습니다: {self.model_path}")
+            self._model = YOLO(settings.YOLO_MODEL_PATH)
+            self._model.to(self.device)
+            self._log_success(f"로딩 성공: {settings.YOLO_MODEL_PATH} -> {self.device}")
         except Exception as e:
-            logging.error(f"모델 로드 실패: {e}")
-            raise
+            self._log_error("로딩 실패", e)
+            self._model = None
     
-    def segment_image(self, image_path: str, confidence_threshold: float = 0.5) -> Dict:
+    def segment_image(self, image: np.ndarray) -> Dict:
         """
         이미지에서 객체 세그멘테이션 수행
         
         Args:
-            image_path: 입력 이미지 경로
-            confidence_threshold: 신뢰도 임계값
+            image: 입력 이미지 (numpy array)
             
         Returns:
             세그멘테이션 결과 딕셔너리
         """
+        if self._model is None:
+            self._load_model()
+
         try:
-            # 이미지 읽기 - EXIF 정보 처리
-            pil_image = Image.open(image_path)
-            pil_image = ImageOps.exif_transpose(pil_image)  # EXIF 회전 정보 처리
-            image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-            
-            # 모델 예측
-            verbose = not (hasattr(Config, 'SIMPLE_DEBUG') and Config.SIMPLE_DEBUG)
-            results = self.model(image, verbose=verbose)
+            # 모델 예측 (confidence threshold는 _parse_results에서 처리)
+            verbose = not settings.DEBUG_MODE
+            results = self._model(image, verbose=verbose)
             
             # 결과 파싱
-            segmentation_results = self._parse_results(results[0], image.shape, confidence_threshold)
+            segmentation_results = self._parse_results(results[0], image.shape)
             
             return {
                 "image_shape": image.shape,
@@ -79,15 +70,14 @@ class YOLOSegmentationModel:
         except Exception as e:
             logging.error(f"세그멘테이션 실행 중 오류: {e}")
             raise
-    
-    def _parse_results(self, result, image_shape: Tuple, confidence_threshold: float) -> Dict:
+
+    def _parse_results(self, result, image_shape: Tuple) -> Dict:
         """
-        YOLO 결과를 파싱하여 구조화된 데이터로 변환
+        YOLO 결과를 파싱하여 구조화된 데이터로 변환 (사용자 제공 안정 버전 기반)
         
         Args:
             result: YOLO 모델의 예측 결과
             image_shape: 원본 이미지 크기
-            confidence_threshold: 신뢰도 임계값
             
         Returns:
             파싱된 결과 딕셔너리
@@ -96,177 +86,86 @@ class YOLOSegmentationModel:
         reference_objects = []
         all_objects = []
         
-        if result.masks is not None:
-            masks = result.masks.data.cpu().numpy()
-            boxes = result.boxes.data.cpu().numpy()
-            
-            for i, (mask, box) in enumerate(zip(masks, boxes)):
-                confidence = box[4]
-                class_id = int(box[5])
-                
-                if confidence < confidence_threshold:
-                    continue
-                
-                # 마스크 처리
-                mask_binary = (mask > 0.5).astype(np.uint8)
-                
-                # 바운딩 박스 좌표
-                x1, y1, x2, y2 = box[:4].astype(int)
-                
-                # 픽셀 면적 계산
-                pixel_area = np.sum(mask_binary)
-                
-                # 객체 정보 생성
-                obj_info = {
-                    "class_id": class_id,
-                    "class_name": self._get_class_name(class_id),
-                    "confidence": float(confidence),
-                    "bbox": [x1, y1, x2, y2],
-                    "pixel_area": int(pixel_area),
-                    "mask": mask_binary,
-                    "center": [(x1 + x2) // 2, (y1 + y2) // 2],
-                    "position": {
-                        "x": (x1 + x2) // 2,
-                        "y": (y1 + y2) // 2,
-                        "width": x2 - x1,
-                        "height": y2 - y1
-                    }
-                }
-                
-                all_objects.append(obj_info)
-                
-                # 음식 vs 기준 물체 분류
-                if class_id == 0:  # 음식
-                    food_objects.append(obj_info)
-                elif class_id == 1:  # 이어폰 케이스
-                    reference_objects.append(obj_info)
+        # 결과가 없는 경우 즉시 반환
+        if result.masks is None or result.boxes is None:
+            return {
+                "food_objects": food_objects,
+                "reference_objects": reference_objects,
+                "all_objects": all_objects
+            }
+
+        # .data 속성을 사용하여 raw tensor 추출 후 numpy로 변환
+        masks = result.masks.data.cpu().numpy()
+        boxes = result.boxes.data.cpu().numpy()
         
+        confidence_threshold = settings.CONFIDENCE_THRESHOLD
+
+        for i, box in enumerate(boxes):
+            confidence = box[4]
+            
+            if confidence < confidence_threshold:
+                continue
+            
+            class_id = int(box[5])
+            
+            # 마스크 처리 및 리사이즈
+            mask = masks[i]
+            mask_binary = (mask > 0.5).astype(np.uint8)
+            if mask_binary.shape != image_shape[:2]:
+                mask_binary = cv2.resize(mask_binary, (image_shape[1], image_shape[0]), interpolation=cv2.INTER_NEAREST)
+
+            # 바운딩 박스 좌표
+            x1, y1, x2, y2 = box[:4].astype(int)
+            
+            # 픽셀 면적 계산
+            pixel_area = np.sum(mask_binary)
+            
+            # 객체 정보 생성
+            obj_info = {
+                "class_id": class_id,
+                "class_name": self._get_class_name(class_id),
+                "confidence": float(confidence),
+                "bbox": [x1, y1, x2, y2],
+                "pixel_area": int(pixel_area),
+                "mask": mask_binary,
+                "center": [(x1 + x2) // 2, (y1 + y2) // 2],
+                "position": {
+                    "x": (x1 + x2) // 2,
+                    "y": (y1 + y2) // 2,
+                    "width": x2 - x1,
+                    "height": y2 - y1
+                }
+            }
+            
+            all_objects.append(obj_info)
+            
+            # 음식 vs 기준 물체 분류
+            class_name = self._get_class_name(class_id)
+            if class_name == "food":
+                food_objects.append(obj_info)
+            elif class_name == "earphone_case":
+                reference_objects.append(obj_info)
+    
         return {
             "food_objects": food_objects,
             "reference_objects": reference_objects,
             "all_objects": all_objects
         }
-    
+
     def _get_class_name(self, class_id: int) -> str:
         """클래스 ID를 클래스 이름으로 변환"""
         return self.class_mapping.get(class_id, f"unknown_{class_id}")
-    
-    def visualize_segmentation(self, image_path: str, save_path: str = None, show_masks: bool = True, 
-                              show_boxes: bool = True, alpha: float = 0.5) -> np.ndarray:
-        """
-        세그멘테이션 결과를 시각화
-        
-        Args:
-            image_path: 입력 이미지 경로
-            save_path: 저장할 경로 (선택사항)
-            show_masks: 마스크 표시 여부
-            show_boxes: 바운딩 박스 표시 여부
-            alpha: 마스크 투명도 (0.0 ~ 1.0)
-            
-        Returns:
-            시각화된 이미지
-        """
-        try:
-            # 이미지 읽기 - EXIF 정보 처리
-            pil_image = Image.open(image_path)
-            pil_image = ImageOps.exif_transpose(pil_image)  # EXIF 회전 정보 처리
-            image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-            
-            segmentation_results = self.segment_image(image_path)
-            
-            # 시각화 이미지 생성
-            vis_image = image.copy()
-            overlay = image.copy()
-            
-            # 음식 객체 시각화 (빨간색 계열)
-            food_color = (0, 0, 255)  # 빨간색
-            for i, obj in enumerate(segmentation_results["food_objects"]):
-                if show_masks:
-                    mask = obj["mask"]
-                    # 마스크 크기를 원본 이미지 크기에 맞춤
-                    if mask.shape != image.shape[:2]:
-                        mask = cv2.resize(mask.astype(np.uint8), 
-                                        (image.shape[1], image.shape[0]), 
-                                        interpolation=cv2.INTER_NEAREST)
-                    
-                    # 반투명 마스크 적용
-                    overlay[mask > 0] = food_color
-                
-                if show_boxes:
-                    # 바운딩 박스 그리기
-                    x1, y1, x2, y2 = obj["bbox"]
-                    cv2.rectangle(vis_image, (x1, y1), (x2, y2), food_color, 3)
-                    
-                    # 라벨 배경
-                    label = f"Food #{i+1}: {obj['confidence']:.2f}"
-                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-                    cv2.rectangle(vis_image, (x1, y1-label_size[1]-10), 
-                                (x1+label_size[0], y1), food_color, -1)
-                    
-                    # 라벨 텍스트
-                    cv2.putText(vis_image, label, (x1, y1-5), 
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            
-            # 기준 물체 시각화 (파란색 계열)
-            ref_color = (255, 100, 0)  # 주황색-파란색
-            for i, obj in enumerate(segmentation_results["reference_objects"]):
-                if show_masks:
-                    mask = obj["mask"]
-                    # 마스크 크기를 원본 이미지 크기에 맞춤
-                    if mask.shape != image.shape[:2]:
-                        mask = cv2.resize(mask.astype(np.uint8), 
-                                        (image.shape[1], image.shape[0]), 
-                                        interpolation=cv2.INTER_NEAREST)
-                    
-                    # 반투명 마스크 적용
-                    overlay[mask > 0] = ref_color
-                
-                if show_boxes:
-                    # 바운딩 박스 그리기
-                    x1, y1, x2, y2 = obj["bbox"]
-                    cv2.rectangle(vis_image, (x1, y1), (x2, y2), ref_color, 3)
-                    
-                    # 라벨 배경
-                    label = f"Reference #{i+1}: {obj['confidence']:.2f}"
-                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-                    cv2.rectangle(vis_image, (x1, y1-label_size[1]-10), 
-                                (x1+label_size[0], y1), ref_color, -1)
-                    
-                    # 라벨 텍스트
-                    cv2.putText(vis_image, label, (x1, y1-5), 
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            
-            # 마스크와 원본 이미지 블렌딩
-            if show_masks:
-                vis_image = cv2.addWeighted(vis_image, 1-alpha, overlay, alpha, 0)
-            
-            # 범례 추가
-            legend_y = 30
-            cv2.putText(vis_image, "Segmentation Results:", (10, legend_y), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            cv2.putText(vis_image, f"Food: {len(segmentation_results['food_objects'])} detected", 
-                       (10, legend_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, food_color, 2)
-            cv2.putText(vis_image, f"Reference: {len(segmentation_results['reference_objects'])} detected", 
-                       (10, legend_y + 55), cv2.FONT_HERSHEY_SIMPLEX, 0.5, ref_color, 2)
-            
-            # 이미지 저장
-            if save_path:
-                # 디렉토리가 없으면 생성
-                import os
-                os.makedirs(os.path.dirname(save_path) if os.path.dirname(save_path) else '.', exist_ok=True)
-                cv2.imwrite(save_path, vis_image)
-                logging.info(f"세그멘테이션 시각화 저장: {save_path}")
-            
-            return vis_image
-            
-        except Exception as e:
-            logging.error(f"시각화 중 오류: {e}")
-            raise
-    
-    def get_model_info(self) -> Dict:
-        """모델 정보 반환"""
-        return {
-            "model_path": self.model_path,
-            "device": str(self.device),
-            "class_mapping": self.class_mapping
-        } 
+
+# 싱글톤 인스턴스 생성
+yolo_model = YOLOSegmentationModel()
+
+def load_image(image_path: str | Path) -> np.ndarray | None:
+    """EXIF 정보를 처리하며 이미지를 로드하고 BGR 형식으로 변환"""
+    try:
+        pil_image = Image.open(image_path)
+        pil_image = ImageOps.exif_transpose(pil_image)
+        # RGB -> BGR로 변환
+        return cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+    except Exception as e:
+        logging.error(f"이미지 로드 실패: {image_path}, 오류: {e}")
+        return None 

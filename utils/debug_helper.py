@@ -21,7 +21,7 @@ class DebugHelper:
         self.step_times = {}
         self.step_counter = 0
         
-    def log_step_start(self, step_name: str):
+    def log_step_start(self, step_name: str) -> None:
         """단계 시작 로그"""
         if not self.enable_debug:
             return
@@ -32,7 +32,7 @@ class DebugHelper:
         print(f"{'='*60}")
         self.step_times[step_name] = time.time()
         
-    def log_step_end(self, step_name: str):
+    def log_step_end(self, step_name: str) -> None:
         """단계 종료 로그"""
         if not self.enable_debug:
             return
@@ -41,7 +41,7 @@ class DebugHelper:
             elapsed = time.time() - self.step_times[step_name]
             print(f"✅ {step_name} 완료 (소요시간: {elapsed:.2f}초)")
         
-    def log_segmentation_debug(self, segmentation_results: Dict):
+    def log_segmentation_debug(self, segmentation_results: Dict) -> None:
         """세그멘테이션 결과 디버그"""
         if not self.enable_debug:
             return
@@ -429,7 +429,7 @@ class DebugHelper:
         print(f"🎯 최종 결과: {final_mass:.1f}g (신뢰도: {final_confidence:.3f})")
         print(f"{'='*60}")
         
-    def print_separator(self, title: str = ""):
+    def print_separator(self, title: str = "") -> None:
         """구분선 출력"""
         if not self.enable_debug:
             return
