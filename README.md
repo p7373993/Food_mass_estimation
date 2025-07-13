@@ -269,9 +269,16 @@ Yolo_midas/
 │   ├── midas_model.py   # MiDaS 깊이 추정
 │   └── llm_model.py     # LLM 질량 추정
 │
-├── pipeline/            # 파이프라인 관리
-│   ├── config.py        # 설정 관리
-│   └── mass_estimation_pipeline.py  # 메인 파이프라인
+├── core/                # 핵심 서비스
+│   └── estimation_service.py    # 질량 추정 서비스
+│
+├── api/                 # REST API 서버
+│   ├── main.py          # FastAPI 애플리케이션
+│   ├── endpoints.py     # API 엔드포인트
+│   └── schemas.py       # 데이터 스키마
+│
+├── config/              # 설정 관리
+│   └── settings.py      # 중앙화된 설정
 │
 ├── utils/               # 유틸리티 함수
 │   ├── feature_extraction.py    # 특징 추출

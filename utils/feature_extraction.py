@@ -3,16 +3,16 @@ import cv2
 from typing import Dict, List, Tuple, Optional
 import logging
 import math
-from pipeline.config import Config
+
+# 의존성 변경: pipeline.config 제거, 필요한 모듈만 남김
 from .camera_info_extractor import CameraInfoExtractor
 from .reference_objects import ReferenceObjectManager
+from config.settings import settings
 
 class FeatureExtractor:
     """
-    세그멘테이션과 깊이 정보에서 특징을 추출하는 클래스 (간소화된 버전)
-    
-    이 클래스는 YOLO 세그멘테이션과 MiDaS 깊이 추정 결과를 받아
-    LLM에 전달할 핵심 특징들만 추출합니다.
+    세그멘테이션과 깊이 정보에서 LLM에 전달할 특징을 추출하는 클래스.
+    기존 로직을 유지하며 새로운 구조에 맞게 조정.
     """
     
     def __init__(self):
@@ -20,30 +20,28 @@ class FeatureExtractor:
         self.reference_manager = ReferenceObjectManager()
         self.camera_info_extractor = CameraInfoExtractor()
     
-    def extract_features(self, segmentation_results: Dict, depth_results: Dict, image_path: str = None) -> Dict:
+    def extract_features(self, segmentation_results: Dict, depth_map: np.ndarray, image_path: str = None) -> Dict:
         """
-        간소화된 특징 추출 - LLM에게 필요한 핵심 정보만 추출
+        특징 추출 메인 메서드.
         
         Args:
-            segmentation_results: YOLO 세그멘테이션 결과
-            depth_results: MiDaS 깊이 추정 결과
-            image_path: 이미지 경로 (선택사항)
+            segmentation_results: yolo_model.segment_image()의 결과.
+            depth_map: midas_model.estimate_depth()의 결과.
+            image_path: 이미지 경로 (EXIF 정보 추출용).
             
         Returns:
-            간소화된 특징 딕셔너리
+            LLM에 전달될 구조화된 특징 딕셔너리.
         """
         try:
-            depth_map = depth_results["depth_map"]
-            
             # 1. 음식 객체 기본 특징 추출
             food_features = self._extract_basic_food_features(
-                segmentation_results["food_objects"], 
+                segmentation_results.get("food_objects", []), 
                 depth_map
             )
             
             # 2. 기준 물체 기본 특징 추출
             reference_features = self._extract_basic_reference_features(
-                segmentation_results["reference_objects"], 
+                segmentation_results.get("reference_objects", []), 
                 depth_map
             )
             
@@ -74,7 +72,7 @@ class FeatureExtractor:
                 "relative_size_info": relative_size_info,
                 "focal_length_info": focal_length_info,
                 "fallback_info": fallback_info,
-                "image_shape": segmentation_results["image_shape"]
+                "image_shape": segmentation_results.get("image_shape")
             }
             
         except Exception as e:
@@ -234,20 +232,20 @@ class FeatureExtractor:
             
             # 3. 실제 크기 추정 (대략적인 스케일링)
             # 일반적인 음식 크기를 고려한 스케일링
-            # 평균적으로 1픽셀 = 0.5mm 정도로 가정
-            pixel_to_mm = 0.5
-            pixel_to_cm = pixel_to_mm / 10.0  # 0.05cm
+            # 설정에서 픽셀-실제 크기 변환 비율 가져오기
+            pixel_to_mm = settings.DEFAULT_PIXEL_TO_MM
+            pixel_to_cm = settings.DEFAULT_PIXEL_TO_CM
             
             # 실제 부피 계산 (cm³)
             estimated_volume_cm3 = shape_corrected_volume * (pixel_to_cm ** 3)
             
             # 4. 합리성 검증 및 보정
             # 너무 작거나 큰 값은 보정
-            if estimated_volume_cm3 < 5.0:  # 5cm³ 이하
-                estimated_volume_cm3 = 20.0  # 최소 20cm³
+            if estimated_volume_cm3 < settings.MIN_VOLUME_CM3:
+                estimated_volume_cm3 = settings.FALLBACK_MIN_VOLUME_CM3
                 confidence = 0.3
-            elif estimated_volume_cm3 > 1000.0:  # 1000cm³ 이상
-                estimated_volume_cm3 = 500.0  # 최대 500cm³
+            elif estimated_volume_cm3 > settings.MAX_VOLUME_CM3:
+                estimated_volume_cm3 = settings.FALLBACK_MAX_VOLUME_CM3
                 confidence = 0.4
             else:
                 confidence = 0.7
@@ -286,7 +284,7 @@ class FeatureExtractor:
                 real_size_ratio = None
                 if food.get("real_volume_info") and ref.get("real_size"):
                     food_volume = food["real_volume_info"].get("volume_cm3", 0)
-                    ref_volume = ref["real_size"].get("volume", 62.5)  # 이어폰 케이스 62.5cm³
+                    ref_volume = ref["real_size"].get("volume", settings.DEFAULT_REFERENCE_VOLUME_CM3)
                     
                     if ref_volume > 0:
                         real_size_ratio = food_volume / ref_volume
@@ -329,7 +327,7 @@ class FeatureExtractor:
             ref_pixel_area = best_ref.get("pixel_area", 1)
             
             # 스케일 계산 개선
-            ref_real_area = ref_real_size.get("area", 25.0)  # 5×5=25cm²
+            ref_real_area = ref_real_size.get("area", settings.DEFAULT_REFERENCE_AREA_CM2)
             if ref_pixel_area > 0 and ref_real_area > 0:
                 pixel_per_cm2 = ref_pixel_area / ref_real_area
                 pixel_per_cm = math.sqrt(pixel_per_cm2)
@@ -345,8 +343,8 @@ class FeatureExtractor:
             depth_variation = depth_info.get("depth_variation", 1.0)
             ref_depth_variation = best_ref.get("depth_info", {}).get("depth_variation", 1.0)
             
-            # 기준 물체의 실제 높이 (이어폰 케이스: 2.5cm)
-            ref_real_height = ref_real_size.get("thickness", 2.5)
+            # 기준 물체의 실제 높이
+            ref_real_height = ref_real_size.get("thickness", settings.DEFAULT_REFERENCE_THICKNESS_CM)
             
             if ref_depth_variation > 0:
                 # 깊이 변화 비율로 실제 높이 계산
@@ -368,11 +366,11 @@ class FeatureExtractor:
             )
             
             # 극단적인 값 보정
-            if estimated_volume_cm3 < 5.0:
-                estimated_volume_cm3 = 15.0
+            if estimated_volume_cm3 < settings.MIN_VOLUME_CM3:
+                estimated_volume_cm3 = settings.FALLBACK_MIN_VOLUME_CM3 * 0.75  # 15.0
                 confidence *= 0.6
-            elif estimated_volume_cm3 > 1000.0:
-                estimated_volume_cm3 = 600.0
+            elif estimated_volume_cm3 > settings.MAX_VOLUME_CM3:
+                estimated_volume_cm3 = settings.FALLBACK_MAX_VOLUME_CM3 * 1.2  # 600.0
                 confidence *= 0.7
             
             return {
@@ -412,17 +410,17 @@ class FeatureExtractor:
                 
                 # 원형도에 따른 형태 보정
                 if circularity > 0.7:  # 원형에 가까움
-                    return 0.65  # 그릇, 둥근 음식
+                    return settings.SHAPE_FACTOR_CIRCULAR  # 그릇, 둥근 음식
                 elif circularity > 0.4:  # 타원형
-                    return 0.60  # 일반적인 음식
+                    return settings.SHAPE_FACTOR_ELLIPTICAL  # 일반적인 음식
                 else:  # 불규칙한 형태
-                    return 0.55  # 복잡한 형태의 음식
+                    return settings.SHAPE_FACTOR_IRREGULAR  # 복잡한 형태의 음식
             
-            return 0.6  # 기본값
+            return settings.SHAPE_FACTOR_DEFAULT  # 기본값
             
         except Exception as e:
             logging.error(f"형태 보정 계수 계산 오류: {e}")
-            return 0.6
+            return settings.SHAPE_FACTOR_DEFAULT
     
     def _calculate_volume_confidence(self, volume_cm3: float, area_cm2: float, 
                                    height_cm: float, ref_obj: Dict) -> float:
@@ -525,13 +523,33 @@ class FeatureExtractor:
                 final_scale = weighted_sum / total_confidence
                 final_confidence = min(total_confidence / len(individual_scales), 1.0)
                 
+                # 가장 신뢰도 높은 스케일 선택 또는 평균
+                if individual_scales:
+                    best_scale_info = max(individual_scales, key=lambda x: x['confidence'])
+                    final_scale = best_scale_info['depth_scale_cm_per_unit']
+                    final_confidence = best_scale_info['confidence']
+                    
+                    # --- 픽셀 스케일 계산 로직 추가 ---
+                    best_ref_obj = next((r for r in reference_features if r['class_name'] == best_scale_info['object_name']), None)
+                    if best_ref_obj:
+                        real_area_cm2 = best_ref_obj.get('real_size', {}).get('area', 0)
+                        pixel_area = best_ref_obj.get('pixel_area', 0)
+                        if real_area_cm2 > 0 and pixel_area > 0:
+                            pixel_per_cm2_ratio = pixel_area / real_area_cm2 # pixel² / cm²
+                            best_scale_info['pixel_per_cm2_ratio'] = pixel_per_cm2_ratio
+                    # --- 로직 끝 ---
+
+                else:
+                    final_scale = 0.0
+
                 return {
                     "has_scale": True,
                     "method": "reference_object_based",
                     "depth_scale_cm_per_unit": final_scale,
                     "confidence": final_confidence,
                     "reference_count": len(individual_scales),
-                    "individual_scales": individual_scales
+                    "individual_scales": individual_scales,
+                    "pixel_per_cm2_ratio": best_scale_info.get('pixel_per_cm2_ratio') # 결과에 추가
                 }
             else:
                 return {

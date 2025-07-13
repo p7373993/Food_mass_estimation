@@ -8,20 +8,40 @@ import numpy as np
 from typing import Dict, List, Any
 import time
 import os
+import cv2
+from datetime import datetime
+
+from config.settings import settings
 
 class DebugHelper:
     """
     파이프라인의 각 단계별 디버그 정보를 상세하게 출력하는 클래스
     """
     
-    def __init__(self, enable_debug: bool = True, simple_mode: bool = False):
+    def __init__(self, enable_debug: bool = True, simple_mode: bool = False, image_path: str = None):
         """디버그 헬퍼 초기화"""
         self.enable_debug = enable_debug
         self.simple_mode = simple_mode
         self.step_times = {}
         self.step_counter = 0
         
-    def log_step_start(self, step_name: str):
+        try:
+            # 결과 파일명을 위한 기반 이름 설정
+            if image_path:
+                base_name = os.path.splitext(os.path.basename(image_path))[0]
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                self.file_basename = f"{base_name}_{timestamp}"
+            else:
+                self.file_basename = f"debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            
+            # 결과 저장 디렉토리 생성
+            settings.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logging.error(f"DebugHelper 초기화 중 오류 발생: {e}", exc_info=True)
+            # 디버깅 기능 비활성화
+            self.enable_debug = False
+        
+    def log_step_start(self, step_name: str) -> None:
         """단계 시작 로그"""
         if not self.enable_debug:
             return
@@ -32,7 +52,7 @@ class DebugHelper:
         print(f"{'='*60}")
         self.step_times[step_name] = time.time()
         
-    def log_step_end(self, step_name: str):
+    def log_step_end(self, step_name: str) -> None:
         """단계 종료 로그"""
         if not self.enable_debug:
             return
@@ -41,7 +61,7 @@ class DebugHelper:
             elapsed = time.time() - self.step_times[step_name]
             print(f"✅ {step_name} 완료 (소요시간: {elapsed:.2f}초)")
         
-    def log_segmentation_debug(self, segmentation_results: Dict):
+    def log_segmentation_debug(self, segmentation_results: Dict) -> None:
         """세그멘테이션 결과 디버그"""
         if not self.enable_debug:
             return
@@ -259,6 +279,131 @@ class DebugHelper:
             print(f"        깊이 - 평균: {depth_info.get('mean_depth', 0):.3f}, 변화: {depth_info.get('depth_variation', 0):.3f}")
             print(f"        실제 크기: {ref.get('real_size', {})}")
     
+    def log_initial_mass_calculation_debug(self, features: Dict, prompt: str, response: str, parsed_result: Dict):
+        """초기 질량 측정 과정을 상세히 디버그 출력합니다."""
+        if not self.enable_debug:
+            return
+            
+        print(f"\n🔬 초기 질량 측정 과정 상세 분석:")
+        print(f"{'='*60}")
+        
+        # 1. 입력 데이터 분석
+        food_objects = features.get("food_objects", [])
+        reference_objects = features.get("reference_objects", [])
+        depth_scale_info = features.get("depth_scale_info", {})
+        
+        print(f"📊 입력 데이터 분석:")
+        if food_objects:
+            food = food_objects[0]
+            print(f"   🍽️ 음식 정보:")
+            print(f"      - 종류: {food.get('class_name', 'unknown')}")
+            print(f"      - 픽셀 면적: {food.get('pixel_area', 0):,}픽셀")
+            
+            # 깊이 정보
+            depth_info = food.get('depth_info', {})
+            print(f"      - 평균 깊이: {depth_info.get('mean_depth', 0):.3f}")
+            print(f"      - 깊이 변화량: {depth_info.get('depth_variation', 0):.3f}")
+            
+            # 실제 크기 정보
+            real_volume_info = food.get('real_volume_info', {})
+            if real_volume_info:
+                print(f"      - 실제 면적: {real_volume_info.get('real_area_cm2', 0):.2f}cm²")
+                print(f"      - 실제 부피: {real_volume_info.get('real_volume_cm3', 0):.2f}cm³")
+        
+        if reference_objects:
+            ref = reference_objects[0]
+            print(f"   📏 기준 물체:")
+            print(f"      - 종류: {ref.get('class_name', 'unknown')}")
+            real_size = ref.get('real_size', {})
+            if real_size:
+                print(f"      - 실제 크기: {real_size.get('width', 0):.1f}cm × {real_size.get('height', 0):.1f}cm")
+                print(f"      - 두께: {real_size.get('thickness', 0):.1f}cm")
+        
+        if depth_scale_info.get('has_scale'):
+            print(f"   🔍 깊이 스케일:")
+            print(f"      - 스케일: {depth_scale_info.get('depth_scale_cm_per_unit', 0):.6f} cm/unit")
+            print(f"      - 면적 비율: {depth_scale_info.get('pixel_per_cm2_ratio', 0):.2f} pixels/cm²")
+            print(f"      - 신뢰도: {depth_scale_info.get('confidence', 0):.3f}")
+        else:
+            print(f"   ⚠️ 깊이 스케일: 계산 실패 또는 정보 없음")
+        
+        # 2. LLM 프롬프트 분석
+        print(f"\n🤖 LLM 프롬프트 분석:")
+        print(f"   - 프롬프트 길이: {len(prompt)} 문자")
+        print(f"   - 계산 가이드 포함: {'예' if '계산 가이드' in prompt else '아니오'}")
+        print(f"   - 기준 물체 정보 포함: {'예' if '기준 물체' in prompt else '아니오'}")
+        print(f"   - 깊이 스케일 정보 포함: {'예' if '깊이 스케일' in prompt else '아니오'}")
+        
+        # 3. LLM 응답 분석
+        print(f"\n🎯 LLM 응답 분석:")
+        print(f"   - 응답 길이: {len(response)} 문자")
+        print(f"   - JSON 형식: {'예' if '{' in response and '}' in response else '아니오'}")
+        
+        if parsed_result:
+            estimated_mass = parsed_result.get('estimated_mass_g', parsed_result.get('mass', 0))
+            confidence = parsed_result.get('confidence', 0)
+            reasoning = parsed_result.get('reasoning', '')
+            
+            print(f"   📊 파싱된 결과:")
+            print(f"      - 추정 질량: {estimated_mass:.1f}g")
+            print(f"      - 신뢰도: {confidence:.3f}")
+            print(f"      - 추정 근거: {reasoning[:200]}{'...' if len(reasoning) > 200 else ''}")
+            
+            # 계산 과정 추출 시도
+            if '부피' in reasoning or 'cm³' in reasoning:
+                print(f"      - 부피 계산: 포함됨")
+            if '밀도' in reasoning or 'g/cm³' in reasoning:
+                print(f"      - 밀도 적용: 포함됨")
+            if '면적' in reasoning or 'cm²' in reasoning:
+                print(f"      - 면적 계산: 포함됨")
+        else:
+            print(f"   ❌ 파싱 실패")
+        
+        # 4. 계산 방법 분석
+        print(f"\n🧮 계산 방법 분석:")
+        has_reference = len(reference_objects) > 0
+        has_depth_scale = depth_scale_info.get('has_scale', False)
+        
+        if has_reference and has_depth_scale:
+            print(f"   ✅ 정확한 스케일 계산 가능")
+            print(f"      - 기준 물체를 통한 스케일링")
+            print(f"      - 깊이 정보를 통한 3D 추정")
+        elif has_reference:
+            print(f"   ⚠️ 부분적 스케일 계산")
+            print(f"      - 기준 물체는 있으나 깊이 스케일 없음")
+        else:
+            print(f"   ❌ 경험적 추정")
+            print(f"      - 기준 물체 없음, 일반적인 음식 크기 기준")
+        
+        # 5. 신뢰도 분석
+        if parsed_result:
+            confidence = parsed_result.get('confidence', 0)
+            print(f"\n📈 신뢰도 분석:")
+            if confidence >= 0.8:
+                print(f"   🟢 높은 신뢰도 ({confidence:.3f})")
+            elif confidence >= 0.6:
+                print(f"   🟡 중간 신뢰도 ({confidence:.3f})")
+            else:
+                print(f"   🔴 낮은 신뢰도 ({confidence:.3f})")
+            
+            # 신뢰도에 영향을 주는 요소들
+            factors = []
+            if has_reference and has_depth_scale:
+                factors.append("정확한 스케일 정보")
+            elif has_reference:
+                factors.append("기준 물체 존재")
+            else:
+                factors.append("경험적 추정")
+            
+            if confidence >= 0.7:
+                factors.append("LLM 계산 신뢰")
+            else:
+                factors.append("LLM 계산 불확실")
+            
+            print(f"   📋 영향 요소: {', '.join(factors)}")
+        
+        print(f"{'='*60}")
+
     def log_llm_prompt_debug(self, prompt: str):
         """LLM 프롬프트 디버그"""
         if not self.enable_debug:
@@ -372,6 +517,10 @@ class DebugHelper:
             multimodal_mass = final_estimate.get("multimodal_mass", 0)
             multimodal_confidence = final_estimate.get("multimodal_confidence", 0)
             print(f"   🔄 멀티모달 결과: {multimodal_mass:.1f}g (신뢰도: {multimodal_confidence:.3f})")
+            # 멀티모달 reasoning 별도 출력
+            multimodal_reasoning = final_estimate.get("multimodal_reasoning") or final_estimate.get("reasoning")
+            if multimodal_reasoning:
+                print(f"   🔄 멀티모달 reasoning: {multimodal_reasoning}")
         
         # 최종 결과  
         final_mass = final_estimate.get("final_mass", 0)
@@ -429,7 +578,7 @@ class DebugHelper:
         print(f"🎯 최종 결과: {final_mass:.1f}g (신뢰도: {final_confidence:.3f})")
         print(f"{'='*60}")
         
-    def print_separator(self, title: str = ""):
+    def print_separator(self, title: str = "") -> None:
         """구분선 출력"""
         if not self.enable_debug:
             return
@@ -437,3 +586,83 @@ class DebugHelper:
         if title:
             print(f"{title}")
             print(f"{'='*60}") 
+    
+    def save_segmentation_visualization(self, image: np.ndarray, segmentation_results: Dict) -> None:
+        """세그멘테이션 결과를 시각화하여 이미지 파일로 저장"""
+        if not self.enable_debug:
+            return
+
+        # 원본 이미지 복사본 생성 (원본 수정 방지)
+        vis_image = image.copy()
+        
+        all_objects = segmentation_results.get("all_objects", [])
+
+        # 클래스별 색상 정의 (BGR)
+        class_colors = {
+            "food": (255, 178, 102),  # Light Blue
+            "earphone_case": (102, 102, 255),  # Light Red
+            "default": (128, 128, 128) # Gray
+        }
+        
+        for obj in all_objects:
+            class_name = obj.get("class_name", "default")
+            color = class_colors.get(class_name, class_colors["default"])
+            
+            # 마스크 오버레이
+            mask = obj.get("mask")
+            if mask is not None:
+                # 마스크 크기를 이미지 크기에 맞게 조정
+                if mask.shape[:2] != vis_image.shape[:2]:
+                    mask = cv2.resize(mask, (vis_image.shape[1], vis_image.shape[0]), interpolation=cv2.INTER_NEAREST)
+                
+                # 3채널 컬러 마스크 생성
+                colored_mask = np.zeros_like(vis_image)
+                colored_mask[mask > 0] = color
+                # 원본 이미지와 합성 (복사본에만 적용)
+                vis_image = cv2.addWeighted(vis_image, 1.0, colored_mask, 0.5, 0)
+            
+            # 바운딩 박스
+            x1, y1, x2, y2 = obj.get("bbox")
+            cv2.rectangle(vis_image, (x1, y1), (x2, y2), color, 2)
+            
+            # 텍스트
+            label = f"{class_name} ({obj.get('confidence', 0):.2f})"
+            cv2.putText(vis_image, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+            
+        try:
+            save_path = settings.RESULTS_DIR / f"{self.file_basename}_segmentation.jpg"
+            cv2.imwrite(str(save_path), vis_image)
+            logging.info(f"🖼️  세그멘테이션 시각화 저장: {save_path}")
+        except Exception as e:
+            logging.error(f"❌ 세그멘테이션 시각화 저장 실패: {e}", exc_info=True)
+
+            
+    def save_depth_map_visualization(self, image: np.ndarray, depth_map: np.ndarray, segmentation_results: Dict = None) -> None:
+        """깊이 맵을 시각화하여 이미지 파일로 저장"""
+        if not self.enable_debug:
+            return
+
+        # 깊이 맵 정규화 (0-255) 및 컬러맵 적용
+        normalized_depth = cv2.normalize(depth_map, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8U)
+        colored_depth = cv2.applyColorMap(normalized_depth, cv2.COLORMAP_JET)
+
+        # 객체 경계선 그리기 (옵션)
+        if segmentation_results:
+            all_objects = segmentation_results.get("all_objects", [])
+            for obj in all_objects:
+                mask = obj.get("mask")
+                if mask is not None:
+                    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    cv2.drawContours(colored_depth, contours, -1, (255, 255, 255), 2) # White
+        
+        # 원본 이미지와 깊이 맵 병합 (원본 이미지 복사본 사용)
+        h, w, _ = image.shape
+        colored_depth_resized = cv2.resize(colored_depth, (w, h))
+        combined_image = cv2.hconcat([image.copy(), colored_depth_resized])  # 원본 이미지 복사본 사용
+        
+        try:
+            save_path = settings.RESULTS_DIR / f"{self.file_basename}_depth.jpg"
+            cv2.imwrite(str(save_path), combined_image)
+            logging.info(f"🖼️  깊이 맵 시각화 저장: {save_path}")
+        except Exception as e:
+            logging.error(f"❌ 깊이 맵 시각화 저장 실패: {e}", exc_info=True)

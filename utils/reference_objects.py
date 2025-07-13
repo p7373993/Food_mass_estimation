@@ -3,6 +3,7 @@ import logging
 import math
 import json
 import os
+from config.settings import settings
 
 class ReferenceObjectManager:
     """
@@ -40,10 +41,10 @@ class ReferenceObjectManager:
                 "type": "rectangular",
                 "width": 5.0,  # cm
                 "height": 5.0,  # cm
-                "thickness": 2.5,  # cm
-                "area": 25.0,  # cm²
-                "volume": 62.5,  # cm³
-                "weight": 100.0,  # g
+                "thickness": settings.DEFAULT_REFERENCE_THICKNESS_CM,  # cm
+                "area": settings.DEFAULT_REFERENCE_AREA_CM2,  # cm²
+                "volume": settings.DEFAULT_REFERENCE_VOLUME_CM3,  # cm³
+                "weight": settings.DEFAULT_MASS,  # g
                 "description": "사용자의 이어폰 케이스",
                 "accuracy": 0.95,
                 "common_variations": {}
@@ -128,8 +129,8 @@ class ReferenceObjectManager:
             obj_name = obj.get("class_name", "")
             if obj_name in self.reference_objects:
                 ref_info = self.reference_objects[obj_name]
-                accuracy = ref_info.get("accuracy", 0.5)
-                confidence = obj.get("confidence", 0.5)
+                accuracy = ref_info.get("accuracy", settings.DEFAULT_CONFIDENCE)
+                confidence = obj.get("confidence", settings.DEFAULT_CONFIDENCE)
                 
                 # 전체 신뢰도 = 기준 물체 정확도 × 감지 신뢰도
                 total_confidence = accuracy * confidence
@@ -160,7 +161,7 @@ class ReferenceObjectManager:
             # 정확도가 높은 순으로 추천
             sorted_refs = sorted(
                 self.reference_objects.items(),
-                key=lambda x: x[1].get("accuracy", 0.5),
+                key=lambda x: x[1].get("accuracy", settings.DEFAULT_CONFIDENCE),
                 reverse=True
             )
             suggestions = [name for name, _ in sorted_refs[:3]]

@@ -1,0 +1,131 @@
+{
+  "mass_estimation": {
+    "estimated_mass_g": 160,
+    "confidence": 0.95,
+    "reasoning": "이미지 속 음식은 '빙그레 메로나 컵' 아이스크림으로 명확히 식별됩니다. 제품 라벨 상단에 '160ml'라고 명시되어 있으며, 아이스크림의 경우 ml와 g이 거의 동일하게 사용되므로 약 160g에 해당합니다. 초기 추정 질량인 357.9g은 실제 라벨에 명시된 질량(160g)보다 훨씬 높으므로, 초기 추정치는 과대평가된 것으로 판단됩니다. 시각적으로도 해당 컵은 일반적인 1인분 아이스크림 컵 크기로 보이며, 357.9g에 해당하는 '대용량'으로 보이지 않습니다. 따라서 검증된 질량은 라벨 정보를 기반으로 160g입니다.",
+    "verification_method": "label_based",
+    "food_type": "packaged_product",
+    "food_name": "빙그레 메로나 컵",
+    "size_estimation": "standard",
+    "initial_estimation": {
+      "estimated_mass_g": 357.9,
+      "confidence": 0.75,
+      "reasoning": "음식의 픽셀 면적(28,574픽셀)을 면적 비율(192.96 pixels/cm²)로 나누어 실제 면적(약 148.08 cm²)을 계산했습니다. 깊이 변화량(24.899)에 깊이 스케일(0.1617 cm/unit)을 곱하여 실제 높이(약 4.03 cm)를 추정했습니다. 계산된 면적과 높이에 형태 보정 계수(0.6)를 적용하여 부피(약 357.90 cm³)를 산출했습니다. 마지막으로, 일반적인 음식 밀도(1.0 g/cm³)를 곱하여 최종 질량을 추정했습니다."
+    },
+    "multimodal_estimation": {
+      "food_type": "packaged_product",
+      "food_name": "빙그레 메로나 컵",
+      "size_estimation": "standard",
+      "has_clear_label": true,
+      "label_mass_g": 160,
+      "product_name": "빙그레 메로나 컵",
+      "verified_mass_g": 160,
+      "confidence": 1.0,
+      "reasoning": "이미지 속 음식은 '빙그레 메로나 컵' 아이스크림으로 명확히 식별됩니다. 제품 라벨 상단에 '160ml'라고 명시되어 있으며, 아이스크림의 경우 ml와 g이 거의 동일하게 사용되므로 약 160g에 해당합니다. 초기 추정 질량인 357.9g은 실제 라벨에 명시된 질량(160g)보다 훨씬 높으므로, 초기 추정치는 과대평가된 것으로 판단됩니다. 시각적으로도 해당 컵은 일반적인 1인분 아이스크림 컵 크기로 보이며, 357.9g에 해당하는 '대용량'으로 보이지 않습니다. 따라서 검증된 질량은 라벨 정보를 기반으로 160g입니다."
+    }
+  },
+  "features": {
+    "food_objects": [
+      {
+        "class_id": 0,
+        "class_name": "food",
+        "confidence": 0.930083155632019,
+        "bbox": [
+          "905",
+          "707",
+          "2129",
+          "1971"
+        ],
+        "pixel_area": 28574,
+        "depth_info": {
+          "mean_depth": 26.999122619628906,
+          "depth_variation": 24.89944839477539
+        },
+        "volume_estimate": {
+          "pixel_volume": 426886.1030593872,
+          "volume_cm3": 53.36076288242341,
+          "confidence": 0.7,
+          "calculation_method": "improved_shape_corrected",
+          "shape_factor": 0.6,
+          "pixel_to_cm": 0.05
+        }
+      }
+    ],
+    "reference_objects": [
+      {
+        "class_id": 1,
+        "class_name": "earphone_case",
+        "confidence": 0.895531177520752,
+        "bbox": [
+          "1968",
+          "1387",
+          "2451",
+          "1870"
+        ],
+        "pixel_area": 4824,
+        "depth_info": {
+          "mean_depth": 29.334009170532227,
+          "depth_variation": 15.463035583496094
+        },
+        "real_size": {
+          "name": "이어폰 케이스",
+          "type": "rectangular",
+          "width": 5.0,
+          "height": 5.0,
+          "thickness": 2.5,
+          "area": 25.0,
+          "volume": 62.5,
+          "weight": 100.0,
+          "description": "사용자의 이어폰 케이스",
+          "accuracy": 0.95,
+          "common_variations": {}
+        }
+      }
+    ],
+    "depth_scale_info": {
+      "has_scale": true,
+      "method": "reference_object_based",
+      "depth_scale_cm_per_unit": 0.16167588740908567,
+      "confidence": 0.895531177520752,
+      "reference_count": 1,
+      "individual_scales": [
+        {
+          "object_name": "earphone_case",
+          "real_thickness_cm": 2.5,
+          "depth_variation": 15.463035583496094,
+          "depth_scale_cm_per_unit": 0.16167588740908567,
+          "confidence": 0.895531177520752,
+          "pixel_per_cm2_ratio": 192.96
+        }
+      ],
+      "pixel_per_cm2_ratio": 192.96
+    },
+    "relative_size_info": [
+      {
+        "food_class": "food",
+        "reference_class": "earphone_case",
+        "pixel_area_ratio": 5.923300165837479,
+        "depth_ratio": 1.6102561660888182,
+        "calculation_method": "pixel_only",
+        "confidence": 0.5
+      }
+    ],
+    "focal_length_info": {
+      "has_focal_length": true,
+      "focal_length_mm": 5.4,
+      "focal_length_35mm": 23.0,
+      "camera_type": "smartphone"
+    },
+    "fallback_info": {
+      "method": "reference_based",
+      "confidence": 0.85,
+      "description": "기준 물체와 깊이 스케일을 활용한 정확한 계산 가능",
+      "recommended_approach": "기준 물체 기반 계산"
+    },
+    "image_shape": [
+      2252,
+      4000,
+      3
+    ]
+  }
+}
