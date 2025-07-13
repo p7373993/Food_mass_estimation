@@ -7,6 +7,7 @@ from models.yolo_model import yolo_model, load_image
 from models.midas_model import midas_model
 from models.llm_model import llm_estimator
 from utils.feature_extraction import FeatureExtractor
+from utils.debug_helper import DebugHelper
 from config.settings import settings
 
 class MassEstimationService:
@@ -41,10 +42,21 @@ class MassEstimationService:
         """
         try:
             logging.info("질량 추정 파이프라인 시작...")
+            
+            # DebugHelper 인스턴스 생성
+            debug_helper = DebugHelper(
+                enable_debug=settings.DEBUG_MODE, 
+                simple_mode=settings.SIMPLE_DEBUG,
+                image_path=image_path
+            )
 
             # 1단계: YOLO 세그멘테이션
             logging.info("1단계: YOLO 세그멘테이션 실행")
             segmentation_results = self.yolo_model.segment_image(image)
+            debug_helper.log_segmentation_debug(segmentation_results)
+            
+            # 시각화 추가
+            debug_helper.save_segmentation_visualization(image, segmentation_results)
             
             # 객체 감지 실패 시 파이프라인 중단
             if not segmentation_results.get("food_objects"):
@@ -58,13 +70,39 @@ class MassEstimationService:
                 logging.error("깊이 추정에 실패했습니다.")
                 return {"error": "깊이 추정에 실패했습니다."}
 
+            # 시각화 추가
+            debug_helper.save_depth_map_visualization(image, depth_map, segmentation_results)
+
             # 3단계: 특징 추출
             logging.info("3단계: 특징 추출 실행")
             features = self.feature_extractor.extract_features(segmentation_results, depth_map, image_path)
 
             # 4단계: LLM 질량 추정
             logging.info("4단계: LLM 질량 추정 실행")
-            estimated_result = self.llm_estimator.estimate_mass_from_features(features)
+            debug_helper.log_step_start("LLM 질량 추정")
+            
+            estimated_result = self.llm_estimator.estimate_mass_from_features(
+                features, debug_helper=debug_helper
+            )
+            
+            debug_helper.log_step_end("LLM 질량 추정")
+
+            # 5단계: 멀티모달 검증 (설정에 따라 선택적 실행)
+            if settings.ENABLE_MULTIMODAL and not estimated_result.get("error"):
+                logging.info("5단계: 멀티모달 검증 실행")
+                verification_result = self.llm_estimator.verify_mass_with_multimodal(
+                    image, estimated_result, features
+                )
+                
+                if not verification_result.get("error"):
+                    # 검증 결과로 최종 결과 업데이트
+                    estimated_result = verification_result
+                    logging.info("멀티모달 검증 완료")
+                else:
+                    logging.warning(f"멀티모달 검증 실패: {verification_result.get('error')}")
+                    logging.info("초기 추정 결과 사용")
+            else:
+                logging.info("멀티모달 검증 건너뜀 (비활성화 또는 오류)")
 
             # 최종 결과 조합
             final_result = {

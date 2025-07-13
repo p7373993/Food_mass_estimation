@@ -58,7 +58,7 @@ class YOLOSegmentationModel(BaseModel):
             results = self._model(image, verbose=verbose)
             
             # 결과 파싱
-            segmentation_results = self._parse_results(results[0], image.shape)
+            segmentation_results = self._parse_results(results[0], results[0].masks.data.shape[1:] if results[0].masks is not None else image.shape[:2])
             
             return {
                 "image_shape": image.shape,
@@ -111,14 +111,32 @@ class YOLOSegmentationModel(BaseModel):
             # 마스크 처리 및 리사이즈
             mask = masks[i]
             mask_binary = (mask > 0.5).astype(np.uint8)
-            if mask_binary.shape != image_shape[:2]:
+            
+            # 디버그 정보 추가
+            if settings.DEBUG_MODE:
+                print(f"마스크 {i}: 원본 크기 {mask.shape}, 이진화 후 크기 {mask_binary.shape}")
+                print(f"마스크 {i}: 이진화 전 최소값 {mask.min():.3f}, 최대값 {mask.max():.3f}")
+                print(f"마스크 {i}: 이진화 후 1의 개수 {np.sum(mask_binary)}")
+            
+            # 마스크가 이미 올바른 크기인지 확인 (리사이즈가 필요한 경우에만 수행)
+            # YOLO 모델이 이미 적절한 크기로 처리했으므로 불필요한 리사이즈 방지
+            if mask_binary.shape != image_shape[:2] and image_shape[0] > 0 and image_shape[1] > 0:
+                original_size = mask_binary.shape
                 mask_binary = cv2.resize(mask_binary, (image_shape[1], image_shape[0]), interpolation=cv2.INTER_NEAREST)
+                if settings.DEBUG_MODE:
+                    print(f"마스크 {i}: 리사이즈 {original_size} -> {mask_binary.shape}")
+                    print(f"마스크 {i}: 리사이즈 후 1의 개수 {np.sum(mask_binary)}")
+            elif settings.DEBUG_MODE:
+                print(f"마스크 {i}: 리사이즈 불필요 (이미 올바른 크기)")
 
             # 바운딩 박스 좌표
             x1, y1, x2, y2 = box[:4].astype(int)
             
             # 픽셀 면적 계산
             pixel_area = np.sum(mask_binary)
+            
+            if settings.DEBUG_MODE:
+                print(f"객체 {i} ({self._get_class_name(class_id)}): 픽셀 면적 {pixel_area:,}")
             
             # 객체 정보 생성
             obj_info = {

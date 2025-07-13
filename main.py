@@ -151,6 +151,17 @@ def main():
     debug_mode = args.debug or args.simple_debug
     simple_debug = args.simple_debug
     
+    # 디버그 모드 설정 업데이트
+    if debug_mode:
+        settings.DEBUG_MODE = True
+        if simple_debug:
+            settings.SIMPLE_DEBUG_MODE = True
+    
+    # 멀티모달 검증 설정 업데이트
+    if args.no_multimodal:
+        settings.ENABLE_MULTIMODAL = False
+        print("멀티모달 검증이 비활성화되었습니다.")
+    
     # 로깅 설정
     setup_logging(debug_mode, simple_debug)
     logger = logging.getLogger(__name__)

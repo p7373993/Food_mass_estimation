@@ -38,8 +38,10 @@ class Settings(BaseSettings):
     
     # LLM 설정
     LLM_PROVIDER: str = "gemini"
-    LLM_MODEL_NAME: str = "gemini-1.5-flash"
-    MULTIMODAL_MODEL_NAME: str = "gemini-1.5-flash"
+    LLM_MODEL_NAME: str = "gemini-2.5-flash"  # 2.0 Flash Experimental (더 정확한 모델)
+    MULTIMODAL_MODEL_NAME: str | None = "gemini-2.5-flash"  # 멀티모달도 동일한 모델 사용
+    LLM_TEMPERATURE: float = 0.0  # 완전히 결정론적
+    LLM_TOP_P: float = 0.0  # 완전히 결정론적 (top_p=0은 가장 확실한 토큰만 선택)
     
     # API 키 설정
     GEMINI_API_KEY: str | None = None
@@ -54,7 +56,7 @@ class Settings(BaseSettings):
     
     # 이미지 처리 설정
     MAX_IMAGE_SIZE: int = 1920
-    CONFIDENCE_THRESHOLD: float = 0.5
+    CONFIDENCE_THRESHOLD: float = 0.25
     
     # 파일 경로 설정
     RESULTS_DIR: Path = ROOT_DIR / "results"
