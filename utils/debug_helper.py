@@ -592,6 +592,7 @@ class DebugHelper:
         if not self.enable_debug:
             return
 
+        # 원본 이미지 복사본 생성 (원본 수정 방지)
         vis_image = image.copy()
         
         all_objects = segmentation_results.get("all_objects", [])
@@ -617,7 +618,7 @@ class DebugHelper:
                 # 3채널 컬러 마스크 생성
                 colored_mask = np.zeros_like(vis_image)
                 colored_mask[mask > 0] = color
-                # 원본 이미지와 합성
+                # 원본 이미지와 합성 (복사본에만 적용)
                 vis_image = cv2.addWeighted(vis_image, 1.0, colored_mask, 0.5, 0)
             
             # 바운딩 박스
@@ -654,10 +655,10 @@ class DebugHelper:
                     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                     cv2.drawContours(colored_depth, contours, -1, (255, 255, 255), 2) # White
         
-        # 원본 이미지와 깊이 맵 병합
+        # 원본 이미지와 깊이 맵 병합 (원본 이미지 복사본 사용)
         h, w, _ = image.shape
         colored_depth_resized = cv2.resize(colored_depth, (w, h))
-        combined_image = cv2.hconcat([image, colored_depth_resized])
+        combined_image = cv2.hconcat([image.copy(), colored_depth_resized])  # 원본 이미지 복사본 사용
         
         try:
             save_path = settings.RESULTS_DIR / f"{self.file_basename}_depth.jpg"
