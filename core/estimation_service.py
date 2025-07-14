@@ -24,10 +24,11 @@ class MassEstimationService:
         self.llm_estimator = llm_estimator
         self.feature_extractor = FeatureExtractor()
         
-        if settings.DEBUG_MODE:
-            logging.basicConfig(level=logging.DEBUG, format=settings.LOG_FORMAT)
-        else:
-            logging.basicConfig(level=logging.INFO, format=settings.LOG_FORMAT)
+        # 로깅 설정은 main.py에서 이미 설정되었으므로 여기서는 건드리지 않음
+        # if settings.DEBUG_MODE:
+        #     logging.basicConfig(level=logging.DEBUG, format=settings.LOG_FORMAT)
+        # else:
+        #     logging.basicConfig(level=logging.INFO, format=settings.LOG_FORMAT)
 
     def run_pipeline(self, image: np.ndarray, image_path: str = None) -> Dict:
         """

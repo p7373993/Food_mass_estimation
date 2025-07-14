@@ -93,17 +93,53 @@ async def estimate_mass(
         # mass_estimation 결과에서도 numpy 타입 변환
         mass_estimation = convert_numpy_types(result.get("mass_estimation", {}))
 
-        # 디버그 모드에서 전체 결과 로깅
+        # 간소화된 응답 생성
+        detected_objects = {
+            "food": len(result.get("features", {}).get("food_objects", [])),
+            "reference_objects": len(result.get("features", {}).get("reference_objects", []))
+        }
+        
+        # 질량 추정 결과 간소화
+        simplified_mass_estimation = {}
+        
+        if "food_verifications" in mass_estimation and mass_estimation["food_verifications"]:
+            # 멀티모달 검증 결과가 있는 경우
+            food_ver = mass_estimation["food_verifications"][0]
+            simplified_mass_estimation = {
+                "estimated_mass_g": food_ver.get("verified_mass_g"),
+                "confidence": food_ver.get("confidence"),
+                "food_name": food_ver.get("food_name"),
+                "verification_method": food_ver.get("verification_method")
+            }
+        elif "food_estimations" in mass_estimation and mass_estimation["food_estimations"]:
+            # 초기 추정 결과가 있는 경우
+            food_est = mass_estimation["food_estimations"][0]
+            simplified_mass_estimation = {
+                "estimated_mass_g": food_est.get("estimated_mass_g"),
+                "confidence": food_est.get("confidence"),
+                "food_name": food_est.get("food_name", "알수없음"),
+                "verification_method": "initial_estimation"
+            }
+        else:
+            # 기존 단일 결과 (하위 호환성)
+            simplified_mass_estimation = {
+                "estimated_mass_g": mass_estimation.get("estimated_mass_g"),
+                "confidence": mass_estimation.get("confidence"),
+                "food_name": "알수없음",
+                "verification_method": "basic_estimation"
+            }
+
+        # 디버그 모드에서 간소화된 결과 로깅
         if settings.DEBUG_MODE:
-            logging.info("=== API 응답 결과 ===")
-            logging.info(f"mass_estimation: {mass_estimation}")
-            logging.info(f"features keys: {list(result.get('features', {}).keys())}")
-            logging.info("=====================")
+            logging.info("=== 간소화된 API 응답 ===")
+            logging.info(f"detected_objects: {detected_objects}")
+            logging.info(f"mass_estimation: {simplified_mass_estimation}")
+            logging.info("========================")
 
         return EstimationResponse(
             filename=file.filename,
-            mass_estimation=mass_estimation,
-            features=result.get("features", {}),
+            detected_objects=detected_objects,
+            mass_estimation=simplified_mass_estimation,
         )
 
     except Exception as e:

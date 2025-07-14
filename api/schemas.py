@@ -23,8 +23,8 @@ class SimplifiedFeature(BaseModel):
 class EstimationResponse(BaseModel):
     """성공적인 질량 추정 API 응답 모델"""
     filename: str
-    mass_estimation: MassEstimation
-    features: Dict[str, Any] = Field(description="추출된 특징들의 요약 정보")
+    detected_objects: Dict[str, int] = Field(description="감지된 객체 개수")
+    mass_estimation: Dict[str, Any] = Field(description="질량 추정 결과")
 
 class ErrorResponse(BaseModel):
     """오류 발생 시 API 응답 모델"""
@@ -33,3 +33,22 @@ class ErrorResponse(BaseModel):
 class HealthCheckResponse(BaseModel):
     """헬스 체크 응답 모델"""
     status: str = "ok" 
+
+# === 비동기 작업 상태 추적용 스키마 추가 ===
+
+class TaskStatus(BaseModel):
+    """비동기 작업 상태 모델"""
+    task_id: str = Field(description="작업 ID")
+    status: str = Field(description="작업 상태: pending, processing, completed, failed")
+    progress: Optional[float] = Field(None, description="진행률 (0.0 ~ 1.0)")
+    message: Optional[str] = Field(None, description="상태 메시지")
+    created_at: Optional[str] = Field(None, description="작업 생성 시간")
+    completed_at: Optional[str] = Field(None, description="작업 완료 시간")
+    result: Optional[EstimationResponse] = Field(None, description="완료된 결과")
+    error: Optional[str] = Field(None, description="오류 메시지")
+
+class TaskCreateResponse(BaseModel):
+    """비동기 작업 생성 응답"""
+    task_id: str = Field(description="생성된 작업 ID")
+    status: str = Field(description="초기 상태")
+    message: str = Field(description="작업 시작 메시지") 
