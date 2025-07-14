@@ -55,13 +55,12 @@ class FeatureExtractor:
             )
             
             # 5. 초점거리 정보만 간단히 추출 (이미지 경로가 있는 경우)
-            focal_length_info = None
-            if image_path:
-                focal_length_info = self.camera_info_extractor.extract_focal_length_only(image_path)
-            
+            # focal_length_info = None
+            # if image_path:
+            #     focal_length_info = self.camera_info_extractor.extract_focal_length_only(image_path)
             # 6. 예외 처리 및 대안적 계산 정보 추가
             fallback_info = self._calculate_fallback_info(
-                food_features, reference_features, depth_scale_info, focal_length_info
+                food_features, reference_features, depth_scale_info, None
             )
             
             # 핵심 정보만 반환
@@ -70,7 +69,7 @@ class FeatureExtractor:
                 "reference_objects": reference_features,
                 "depth_scale_info": depth_scale_info,
                 "relative_size_info": relative_size_info,
-                "focal_length_info": focal_length_info,
+                "focal_length_info": None,
                 "fallback_info": fallback_info,
                 "image_shape": segmentation_results.get("image_shape")
             }
@@ -728,4 +727,4 @@ class FeatureExtractor:
             
         except Exception as e:
             logging.error(f"픽셀 스케일 계산 오류: {e}")
-            return 0.01  # 기본값 (1픽셀 = 0.01cm) 
+            return 0.01  # 기본값 (1픽셀 = 0.01cm)

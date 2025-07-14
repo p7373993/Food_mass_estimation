@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # 파이프라인 설정
     PIPELINE_VERSION: str = "1.0.0"
     ENABLE_MULTIMODAL: bool = True
-    DEBUG_MODE: bool = False
+    DEBUG_MODE: bool = True
     SIMPLE_DEBUG: bool = False
     SAVE_RESULTS: bool = True
     

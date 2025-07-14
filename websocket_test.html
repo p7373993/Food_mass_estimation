@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 실시간 알림 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.connected { background-color: #d4edda; color: #155724; }
+        .status.disconnected { background-color: #f8d7da; color: #721c24; }
+        .status.processing { background-color: #fff3cd; color: #856404; }
+        .status.completed { background-color: #d1ecf1; color: #0c5460; }
+        .status.failed { background-color: #f8d7da; color: #721c24; }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #007bff;
+            transition: width 0.3s ease;
+        }
+        .message-log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .upload-section {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .upload-section.dragover {
+            border-color: #007bff;
+            background-color: #f8f9ff;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <h1>🍽️ 음식 질량 추정 - WebSocket 실시간 알림 테스트</h1>
+    
+    <div class="container">
+        <h2> WebSocket 연결 상태</h2>
+        <div id="ws-status" class="status disconnected">연결되지 않음</div>
+        <button id="connect-btn" onclick="connectWebSocket()">WebSocket 연결</button>
+        <button id="disconnect-btn" onclick="disconnectWebSocket()" disabled>연결 해제</button>
+    </div>
+
+    <div class="container">
+        <h2>📤 이미지 업로드</h2>
+        <div class="upload-section" id="upload-area">
+            <p>이미지 파일을 드래그 앤 드롭하거나 클릭하여 선택하세요</p>
+            <input type="file" id="file-input" accept="image/*" style="display: none;">
+            <button onclick="document.getElementById('file-input').click()">파일 선택</button>
+        </div>
+        <div id="upload-status"></div>
+    </div>
+
+    <div class="container">
+        <h2>📊 작업 진행 상황</h2>
+        <div id="task-info" style="display: none;">
+            <p><strong>작업 ID:</strong> <span id="task-id"></span></p>
+            <p><strong>상태:</strong> <span id="task-status"></span></p>
+            <p><strong>진행률:</strong></p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+            </div>
+            <p><strong>메시지:</strong> <span id="task-message"></span></p>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📝 실시간 메시지 로그</h2>
+        <div class="message-log" id="message-log"></div>
+        <button onclick="clearLog()">로그 지우기</button>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentTaskId = null;
+
+        // API 서버 URL 설정
+        const API_BASE_URL = 'http://localhost:8000';
+        const WS_BASE_URL = 'ws://localhost:8000';
+
+        // WebSocket 연결
+        function connectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                logMessage('이미 연결되어 있습니다.');
+                return;
+            }
+
+            // 임시 task_id로 연결 (실제 작업 시작 시 재연결)
+            ws = new WebSocket(WS_BASE_URL + '/api/v1/ws/task/temp');
+            
+            ws.onopen = function(event) {
+                updateConnectionStatus('connected', 'WebSocket 연결됨');
+                document.getElementById('connect-btn').disabled = true;
+                document.getElementById('disconnect-btn').disabled = false;
+                logMessage('WebSocket 연결됨');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    // 빈 메시지 체크
+                    if (!event.data || event.data.trim() === '') {
+                        logMessage('빈 메시지 수신');
+                        return;
+                    }
+                    
+                    const data = JSON.parse(event.data);
+                    logMessage('수신: ' + JSON.stringify(data, null, 2));
+                    handleTaskUpdate(data);
+                } catch (error) {
+                    logMessage('JSON 파싱 오류: ' + error.message);
+                    logMessage('원본 데이터: ' + event.data);
+                    logMessage('데이터 길이: ' + (event.data ? event.data.length : 0));
+                }
+            };
+            
+            ws.onclose = function(event) {
+                updateConnectionStatus('disconnected', 'WebSocket 연결 해제됨');
+                document.getElementById('connect-btn').disabled = false;
+                document.getElementById('disconnect-btn').disabled = true;
+                logMessage('WebSocket 연결 해제됨 (코드: ' + event.code + ')');
+            };
+            
+            ws.onerror = function(error) {
+                updateConnectionStatus('failed', 'WebSocket 오류 발생');
+                logMessage('WebSocket 오류: ' + error);
+            };
+        }
+
+        // WebSocket 연결 해제
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        // 연결 상태 업데이트
+        function updateConnectionStatus(status, message) {
+            const statusDiv = document.getElementById('ws-status');
+            statusDiv.className = 'status ' + status;
+            statusDiv.textContent = message;
+        }
+
+        // 메시지 로그에 추가
+        function logMessage(message) {
+            const log = document.getElementById('message-log');
+            const timestamp = new Date().toLocaleTimeString();
+            log.innerHTML += `[${timestamp}] ${message}\n`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // 로그 지우기
+        function clearLog() {
+            document.getElementById('message-log').innerHTML = '';
+        }
+
+        // 작업 업데이트 처리
+        function handleTaskUpdate(data) {
+            if (data.type === 'task_update' || data.type === 'task_completed' || data.type === 'task_failed' || data.type === 'task_status') {
+                const taskData = data.data;
+                currentTaskId = data.task_id;
+                
+                // 작업 정보 표시
+                document.getElementById('task-info').style.display = 'block';
+                document.getElementById('task-id').textContent = currentTaskId;
+                document.getElementById('task-status').textContent = taskData.status || '알 수 없음';
+                document.getElementById('task-message').textContent = taskData.message || '';
+                
+                // 진행률 업데이트
+                const progress = taskData.progress || 0;
+                document.getElementById('progress-fill').style.width = (progress * 100) + '%';
+                
+                // 상태에 따른 스타일 변경
+                const taskInfo = document.getElementById('task-info');
+                taskInfo.className = 'container';
+                if (taskData.status === 'completed') {
+                    taskInfo.style.borderColor = '#28a745';
+                } else if (taskData.status === 'failed') {
+                    taskInfo.style.borderColor = '#dc3545';
+                } else if (taskData.status === 'processing') {
+                    taskInfo.style.borderColor = '#ffc107';
+                }
+            } else if (data.type === 'error') {
+                logMessage('서버 오류: ' + data.message);
+            }
+        }
+
+        // 파일 업로드 처리
+        document.getElementById('file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                uploadFile(file);
+            }
+        });
+
+        // 드래그 앤 드롭 처리
+        const uploadArea = document.getElementById('upload-area');
+        
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        });
+
+        // 파일 업로드 함수
+        async function uploadFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('이미지 파일만 업로드 가능합니다.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                document.getElementById('upload-status').innerHTML = '업로드 중...';
+                logMessage('파일 업로드 시작: ' + file.name + ' (' + file.size + ' bytes)');
+                logMessage('업로드 URL: ' + API_BASE_URL + '/api/v1/estimate_async');
+                
+                const response = await fetch(`${API_BASE_URL}/api/v1/estimate_async`, {
+                    method: 'POST',
+                    body: formData,
+                    mode: 'cors',
+                    credentials: 'omit'
+                });
+
+                logMessage('HTTP 응답 상태: ' + response.status + ' ' + response.statusText);
+                logMessage('응답 헤더: ' + JSON.stringify(Object.fromEntries(response.headers.entries())));
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    logMessage('오류 응답 내용: ' + errorText);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const responseText = await response.text();
+                logMessage('응답 내용: ' + responseText);
+                
+                if (!responseText || responseText.trim() === '') {
+                    throw new Error('서버에서 빈 응답을 받았습니다.');
+                }
+
+                const result = JSON.parse(responseText);
+                
+                document.getElementById('upload-status').innerHTML = 
+                    `업로드 성공! 작업 ID: ${result.task_id}`;
+                logMessage('업로드 성공: ' + JSON.stringify(result));
+                
+                // WebSocket 연결이 있으면 해당 작업의 WebSocket으로 재연결
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.close();
+                    setTimeout(() => {
+                        ws = new WebSocket(`${WS_BASE_URL}/api/v1/ws/task/${result.task_id}`);
+                        setupWebSocketHandlers();
+                    }, 1000);
+                }
+            } catch (error) {
+                document.getElementById('upload-status').innerHTML = 
+                    `업로드 오류: ${error.message}`;
+                logMessage('업로드 오류: ' + error.message);
+                logMessage('오류 타입: ' + error.name);
+                logMessage('오류 스택: ' + error.stack);
+                console.error('업로드 오류 상세:', error);
+                
+                // 네트워크 연결 테스트
+                try {
+                    logMessage('네트워크 연결 테스트 시작...');
+                    const testResponse = await fetch(`${API_BASE_URL}/health`, {
+                        method: 'GET',
+                        mode: 'cors',
+                        credentials: 'omit'
+                    });
+                    logMessage('연결 테스트 성공: ' + testResponse.status);
+                } catch (testError) {
+                    logMessage('연결 테스트 실패: ' + testError.message);
+                }
+            }
+        }
+
+        // WebSocket 핸들러 설정
+        function setupWebSocketHandlers() {
+            if (!ws) return;
+            
+            ws.onopen = function(event) {
+                updateConnectionStatus('connected', 'WebSocket 재연결됨');
+                logMessage('WebSocket 재연결됨');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    // 빈 메시지 체크
+                    if (!event.data || event.data.trim() === '') {
+                        logMessage('빈 메시지 수신');
+                        return;
+                    }
+                    
+                    const data = JSON.parse(event.data);
+                    logMessage('수신: ' + JSON.stringify(data, null, 2));
+                    handleTaskUpdate(data);
+                } catch (error) {
+                    logMessage('JSON 파싱 오류: ' + error.message);
+                    logMessage('원본 데이터: ' + event.data);
+                    logMessage('데이터 길이: ' + (event.data ? event.data.length : 0));
+                }
+            };
+            
+            ws.onclose = function(event) {
+                updateConnectionStatus('disconnected', 'WebSocket 연결 해제됨');
+                logMessage('WebSocket 연결 해제됨 (코드: ' + event.code + ')');
+            };
+            
+            ws.onerror = function(error) {
+                updateConnectionStatus('failed', 'WebSocket 오류 발생');
+                logMessage('WebSocket 오류: ' + error);
+            };
+        }
+    </script>
+</body>
+</html> 

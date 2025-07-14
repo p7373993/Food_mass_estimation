@@ -186,20 +186,24 @@ class LLMMassEstimator(BaseModel):
         depth_scale_info = features.get("depth_scale_info", {})
         has_reference = len(reference_objects) > 0
         has_depth_scale = depth_scale_info.get('has_scale', False)
+        
         prompt = "음식 질량 추정 분석:\n\n"
         prompt += f"🍽️ 음식 정보:\n  - 종류: {food.get('class_name', '알수없음')}\n  - 픽셀 면적: {food.get('pixel_area', 0):,}픽셀\n"
         food_depth = food.get('depth_info', {})
         prompt += f"  - 평균 깊이값(상대적): {food_depth.get('mean_depth', 0.0):.3f}\n  - 깊이 변화량(상대적): {food_depth.get('depth_variation', 0.0):.3f}\n"
+        
         if has_reference:
             ref_obj = reference_objects[0]
             prompt += f"\n📏 기준 물체 정보:\n  - 종류: {ref_obj.get('class_name')}\n"
             real_size = ref_obj.get('real_size', {})
             if real_size:
                 prompt += f"  - 실제 크기: {real_size.get('width', 0):.1f}cm × {real_size.get('height', 0):.1f}cm, 두께: {real_size.get('thickness', 0):.1f}cm\n"
+        
         if has_depth_scale:
             prompt += f"\n🔍 계산된 실제 스케일:\n  - 깊이 스케일: {depth_scale_info.get('depth_scale_cm_per_unit', 0.0):.4f} cm/unit\n"
             if depth_scale_info.get('pixel_per_cm2_ratio'):
                 prompt += f"  - 면적 비율: {depth_scale_info.get('pixel_per_cm2_ratio'):.2f} pixels/cm²\n"
+        
         prompt += "\n🎯 계산 과제:\n위 정보를 바탕으로 음식의 질량을 g(그램) 단위로 추정하세요. 부피(cm³)를 먼저 계산한 후, 일반적인 음식 밀도(약 0.8~1.2 g/cm³)를 적용하세요.\n"
         prompt += "\n💡 계산 가이드:\n"
         if has_reference and has_depth_scale and depth_scale_info.get('pixel_per_cm2_ratio'):
@@ -246,9 +250,6 @@ class LLMMassEstimator(BaseModel):
 
 2.  **재검토 및 최종 판단**:
     - 1차 식별 결과에 대해 다른 가능성은 없는지 비판적으로 검토하세요.
-    - **오류 가능성 체크**:
-        - **조명/반사**: 조명이나 포장지 반사 때문에 색상이 왜곡될 수 있습니다. (예: 갈색이 노랗거나 검게 보일 수 있음)
-        - **모양의 함정**: 특정 모양이 여러 음식에서 나타날 수 있습니다. (예: 꽃 모양은 과자, 떡, 젤리 등 다양함)
     - 위 가능성을 고려하여, 1차 판단이 가장 합리적인지, 아니면 더 적절한 다른 음식 이름이 있는지 최종 결론을 내리세요.
 
 3.  **라벨 텍스트 분석**:

@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
 
 # 내부 모듈 임포트
 from . import endpoints
@@ -15,6 +16,14 @@ async def lifespan(app: FastAPI):
     서버 시작 시 모델을 미리 로드하여 응답 속도를 최적화합니다.
     """
     print("="*50)
+    
+    # 로깅 설정
+    if settings.DEBUG_MODE:
+        logging.basicConfig(level=logging.DEBUG, format=settings.LOG_FORMAT)
+        print("🔍 디버그 모드 활성화")
+    else:
+        logging.basicConfig(level=logging.INFO, format=settings.LOG_FORMAT)
+    
     logging.info("서버 시작... 모델을 로딩합니다.")
     
     # MassEstimationService 인스턴스가 생성될 때 내부적으로 모델들이 로드됩니다.
@@ -35,6 +44,21 @@ app = FastAPI(
     description="이미지 속 음식의 질량을 추정하는 API입니다.",
     version=settings.PIPELINE_VERSION,
     lifespan=lifespan
+)
+
+# CORS 미들웨어 추가
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5500",  # Live Server
+        "http://127.0.0.1:5500",  # Live Server (IP)
+        "http://localhost:3000",  # 다른 개발 서버
+        "http://127.0.0.1:3000",  # 다른 개발 서버 (IP)
+        "*"  # 개발 환경에서는 모든 origin 허용
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
 )
 
 # API 라우터 포함
