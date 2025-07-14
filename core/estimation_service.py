@@ -117,7 +117,23 @@ class MassEstimationService:
             return {"error": f"서버 내부 오류가 발생했습니다: {e}"}
 
     def _simplify_features_for_response(self, features: dict) -> dict:
-        """API 응답에 포함될 특징 정보를 간소화합니다. (마스크 등 큰 데이터 제외)"""
+        """API 응답에 포함될 특징 정보를 간소화합니다. (numpy 타입을 Python 타입으로 변환)"""
+        
+        def convert_numpy_types(obj):
+            """numpy 타입을 Python 기본 타입으로 변환"""
+            if isinstance(obj, np.integer):
+                return int(obj)
+            elif isinstance(obj, np.floating):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, dict):
+                return {key: convert_numpy_types(value) for key, value in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_numpy_types(item) for item in obj]
+            else:
+                return obj
+        
         simplified = {}
         for key, value in features.items():
             if isinstance(value, list):
@@ -126,9 +142,11 @@ class MassEstimationService:
                     if isinstance(item, dict):
                         # 마스크와 같이 용량이 큰 데이터는 응답에서 제외
                         item.pop("mask", None)
-                        simplified[key].append(item)
+                        # numpy 타입 변환
+                        simplified_item = convert_numpy_types(item)
+                        simplified[key].append(simplified_item)
             else:
-                simplified[key] = value
+                simplified[key] = convert_numpy_types(value)
         return simplified
 
 # 서비스 인스턴스 생성 (서버에서 이 인스턴스를 사용)

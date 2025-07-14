@@ -6,12 +6,27 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
 # 의존성 및 스키마 임포트
 from core.estimation_service import MassEstimationService, mass_estimation_service
 from .schemas import EstimationResponse, ErrorResponse
+from config.settings import settings
 
 router = APIRouter()
 
 # 의존성 주입 함수
 def get_mass_estimation_service() -> MassEstimationService:
     return mass_estimation_service
+
+@router.get("/pipeline-status", summary="파이프라인 상태 확인")
+async def get_pipeline_status():
+    """현재 파이프라인 상태를 확인합니다."""
+    return {
+        "yolo_model_loaded": hasattr(mass_estimation_service, 'yolo_model'),
+        "midas_model_loaded": hasattr(mass_estimation_service, 'midas_model'),
+        "llm_estimator_loaded": hasattr(mass_estimation_service, 'llm_estimator'),
+        "feature_extractor_loaded": hasattr(mass_estimation_service, 'feature_extractor'),
+        "debug_mode": settings.DEBUG_MODE,
+        "multimodal_enabled": settings.ENABLE_MULTIMODAL,
+        "llm_provider": settings.LLM_PROVIDER,
+        "llm_model": settings.LLM_MODEL_NAME
+    }
 
 @router.post(
     "/estimate",
@@ -59,9 +74,35 @@ async def estimate_mass(
                 detail=result["error"],
             )
 
+        # numpy 타입을 Python 기본 타입으로 변환
+        def convert_numpy_types(obj):
+            """numpy 타입을 Python 기본 타입으로 변환"""
+            if isinstance(obj, np.integer):
+                return int(obj)
+            elif isinstance(obj, np.floating):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, dict):
+                return {key: convert_numpy_types(value) for key, value in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_numpy_types(item) for item in obj]
+            else:
+                return obj
+
+        # mass_estimation 결과에서도 numpy 타입 변환
+        mass_estimation = convert_numpy_types(result.get("mass_estimation", {}))
+
+        # 디버그 모드에서 전체 결과 로깅
+        if settings.DEBUG_MODE:
+            logging.info("=== API 응답 결과 ===")
+            logging.info(f"mass_estimation: {mass_estimation}")
+            logging.info(f"features keys: {list(result.get('features', {}).keys())}")
+            logging.info("=====================")
+
         return EstimationResponse(
             filename=file.filename,
-            mass_estimation=result.get("mass_estimation", {}),
+            mass_estimation=mass_estimation,
             features=result.get("features", {}),
         )
 

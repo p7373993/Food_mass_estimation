@@ -7,6 +7,11 @@ class MassEstimation(BaseModel):
     confidence: Optional[float] = Field(None, description="추정 신뢰도 (0.0 ~ 1.0)")
     reasoning: Optional[str] = Field(None, description="추정 근거")
     error: Optional[str] = None
+    
+    # 여러 음식 처리 결과 (새로운 구조)
+    food_count: Optional[int] = Field(None, description="감지된 음식 개수")
+    food_estimations: Optional[List[Dict[str, Any]]] = Field(None, description="개별 음식 추정 결과")
+    food_verifications: Optional[List[Dict[str, Any]]] = Field(None, description="멀티모달 검증 결과")
 
 class SimplifiedFeature(BaseModel):
     """간소화된 특징 정보 모델"""

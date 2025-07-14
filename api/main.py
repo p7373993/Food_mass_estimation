@@ -15,6 +15,14 @@ async def lifespan(app: FastAPI):
     서버 시작 시 모델을 미리 로드하여 응답 속도를 최적화합니다.
     """
     print("="*50)
+    
+    # 로깅 설정
+    if settings.DEBUG_MODE:
+        logging.basicConfig(level=logging.DEBUG, format=settings.LOG_FORMAT)
+        print("🔍 디버그 모드 활성화")
+    else:
+        logging.basicConfig(level=logging.INFO, format=settings.LOG_FORMAT)
+    
     logging.info("서버 시작... 모델을 로딩합니다.")
     
     # MassEstimationService 인스턴스가 생성될 때 내부적으로 모델들이 로드됩니다.
