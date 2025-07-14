@@ -10,6 +10,7 @@
 - [설치 방법](#-설치-방법)
 - [설정 방법](#-설정-방법)
 - [사용 방법](#-사용-방법)
+- [API 서버 및 WebSocket](#-api-서버-및-websocket)
 - [파이프라인 구조](#-파이프라인-구조)
 - [파일 구조](#-파일-구조)
 - [결과 해석](#-결과-해석)
@@ -23,6 +24,7 @@
 - **YOLO Segmentation**: 음식과 기준 물체 분할
 - **MiDaS Depth Estimation**: 깊이 정보 추정
 - **Large Language Model**: 최종 질량 계산 및 검증
+- **FastAPI + WebSocket**: 실시간 API 서버 및 알림 시스템
 
 ### 작동 원리
 
@@ -31,13 +33,14 @@
 3. 🔍 **특징 추출**: 픽셀 면적, 깊이 분포, 상대적 크기 등 계산
 4. 📐 **스케일 보정**: 기준 물체를 활용하여 실제 크기 계산
 5. 🧠 **LLM 질량 추정**: 추출된 특징을 기반으로 최종 질량 계산
+6. 🌐 **API 서버**: RESTful API와 WebSocket을 통한 실시간 처리
 
 ## ✨ 주요 특징
 
 ### 🎯 정확한 질량 추정
 - **기준 물체 기반 스케일링**: 이어폰 케이스 등 실제 크기를 알 수 있는 물체로 정확한 스케일 계산
-- **카메라 정보 활용**: EXIF 데이터에서 초점거리 추출하여 거리 추정 개선
-- **적응형 질량 추정**: 단순 부피 계산부터 복잡한 형태 분석까지 다양한 방법 지원
+- **부피 기반 계산**: 깊이 정보를 활용한 3D 부피 추정
+- **LLM 검증**: 대규모 언어 모델을 통한 최종 질량 검증
 
 ### 🛠️ 유연한 설정
 - **다중 LLM 지원**: Gemini, OpenAI GPT 지원
@@ -49,6 +52,12 @@
 - **시각화 지원**: 세그멘테이션과 깊이 맵 시각화
 - **강건한 오류 처리**: 예외 상황에 대한 fallback 메커니즘
 
+### 🌐 API 서버 및 실시간 알림
+- **RESTful API**: HTTP 기반 질량 추정 API
+- **WebSocket 실시간 알림**: 작업 진행 상황 실시간 모니터링
+- **동기/비동기 처리**: 즉시 결과 또는 백그라운드 처리 선택
+- **CORS 지원**: 웹 브라우저에서 직접 사용 가능
+
 ## 💻 시스템 요구사항
 
 ### 하드웨어 요구사항
@@ -57,7 +66,7 @@
 - **저장공간**: 최소 5GB (모델 파일 포함)
 
 ### 소프트웨어 요구사항
-- **Python**: 3.8 이상 (권장: 3.9+)
+- **Python**: 3.8 이상 (권장: 3.12)
 - **운영체제**: Windows 10/11, macOS 10.14+, Ubuntu 18.04+
 - **CUDA**: 11.0 이상 (GPU 사용 시)
 - **Git LFS**: 대용량 모델 파일 관리용
@@ -105,7 +114,7 @@ uv pip install -r requirements.txt
 ### 4. 모델 파일 확인
 ```bash
 # YOLO 모델 파일 확인
-ls -la yolo_food.pt
+ls -la weights/yolo_food_v1.pt
 
 # 파일이 없는 경우 Git LFS로 다운로드
 git lfs pull
@@ -117,33 +126,46 @@ git lfs pull
 프로젝트 루트에 `.env` 파일을 생성하고 다음 내용을 추가:
 
 ```env
-# API 키 설정 (둘 중 하나 선택)
-GEMINI_API_KEY=your_gemini_api_key_here
-# OPENAI_API_KEY=your_openai_api_key_here
+# =============================================================================
+# API 키 설정 (필수)
+# =============================================================================
+# Google Gemini API 키
+GEMINI_API_KEY=
 
-# LLM 설정
-LLM_PROVIDER=gemini  # "gemini" 또는 "openai"
-LLM_MODEL_NAME=gemini-1.5-flash
-MULTIMODAL_MODEL_NAME=gemini-1.5-flash
+# OpenAI API 키 (선택사항)
+OPENAI_API_KEY=
 
-# 모델 경로 설정
-YOLO_MODEL_PATH=yolo_food.pt
-MIDAS_MODEL_TYPE=DPT_Large  # "DPT_Large", "DPT_Hybrid", "MiDaS_small"
+# =============================================================================
+# LLM 모델 설정 (필요시 변경)
+# =============================================================================
+# LLM 제공자 선택: "gemini" 또는 "openai"
+LLM_PROVIDER=gemini
 
-# 파이프라인 설정
+# 사용할 LLM 모델 이름
+LLM_MODEL_NAME=gemini-2.5-flash
+
+# 멀티모달 검증용 모델 이름
+MULTIMODAL_MODEL_NAME=gemini-2.5-flash
+
+# =============================================================================
+# 핵심 동작 설정 (필요시 변경)
+# =============================================================================
+# 멀티모달 검증 활성화 여부
 ENABLE_MULTIMODAL=true
+
+# 디버그 모드 (개발용)
 DEBUG_MODE=false
-SIMPLE_DEBUG=false
+
+# 결과 저장 여부
 SAVE_RESULTS=true
 
-# 이미지 처리 설정
-MAX_IMAGE_SIZE=1920
-CONFIDENCE_THRESHOLD=0.5
+# =============================================================================
+# 참고사항
+# =============================================================================
+# - 다른 모든 설정들은 config/settings.py에서 관리됩니다
+# - YOLO 모델 경로, MiDaS 설정, 기본값들은 코드에서 자동 관리
+# - 필요한 경우에만 위 설정들을 수정하세요
 
-# 디렉토리 설정
-RESULTS_DIR=results
-LOGS_DIR=logs
-DATA_DIR=data
 ```
 
 ### 2. API 키 획득
@@ -163,7 +185,9 @@ python main.py --config
 
 ## 🎮 사용 방법
 
-### 기본 사용법
+### 1. 명령줄 실행
+
+#### 기본 사용법
 ```bash
 # 단일 이미지 질량 추정
 python main.py path/to/your/image.jpg
@@ -171,8 +195,9 @@ python main.py path/to/your/image.jpg
 # 예시
 python main.py data/test1.jpg
 ```
+python main.py data/test1.jpg --debug //이거 많이씀씀
 
-### 명령줄 옵션
+#### 명령줄 옵션
 
 | 옵션 | 설명 | 예시 |
 |------|------|------|
@@ -180,11 +205,11 @@ python main.py data/test1.jpg
 | `--simple-debug` | 간단 디버그 모드 | `python main.py image.jpg --simple-debug` |
 | `--no-multimodal` | 멀티모달 검증 비활성화 | `python main.py image.jpg --no-multimodal` |
 | `--output` | 결과 저장 경로 지정 | `python main.py image.jpg --output result.json` |
-| `--api-key` | API 키 직접 지정 | `python main.py image.jpg --api-key YOUR_KEY` |
-| `--model` | LLM 모델 지정 | `python main.py image.jpg --model gpt-4` |
+| `--api-key` | Gemini/OpenAI API 키 직접 지정 | `python main.py image.jpg --api-key YOUR_KEY` |
+| `--model` | LLM 모델 지정 | `python main.py image.jpg --model gpt-4` | 
 | `--config` | 현재 설정 확인 | `python main.py --config` |
 
-### 사용 예시
+#### 사용 예시
 
 ```bash
 # 1. 기본 실행
@@ -205,6 +230,326 @@ python main.py data/test1.jpg --no-multimodal
 # 6. 특정 모델 사용
 python main.py data/test1.jpg --model gemini-1.5-pro
 ```
+
+### 2. API 서버 실행
+
+#### 서버 시작
+```bash
+python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+#### API 문서
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+## 🌐 API 서버 및 WebSocket
+
+### 서버 실행
+```bash
+# 개발 모드 (자동 재시작)
+python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+
+# 프로덕션 모드
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+### 사용 가능한 엔드포인트
+
+#### 1. 동기 처리 (즉시 결과)
+```http
+POST /api/v1/estimate
+Content-Type: multipart/form-data
+
+# 요청: 이미지 파일 업로드
+# 응답: 즉시 질량 추정 결과
+```
+
+#### 2. 비동기 처리 (백그라운드 작업)
+```http
+POST /api/v1/estimate_async
+Content-Type: multipart/form-data
+
+# 요청: 이미지 파일 업로드
+# 응답: 작업 ID 반환
+```
+
+#### 3. 작업 상태 조회
+```http
+GET /api/v1/task/{task_id}
+
+# 응답: 작업 진행 상황 및 결과
+```
+
+#### 4. WebSocket 실시간 알림
+```http
+WS /api/v1/ws/task/{task_id}
+
+# 실시간으로 작업 진행 상황 수신
+```
+
+#### 5. 파이프라인 상태 확인
+```http
+GET /api/v1/pipeline-status
+
+# 각 모델의 로드 상태 확인
+```
+
+#### 6. 서버 상태 확인
+```http
+GET /health
+
+# 서버 정상 동작 확인
+```
+
+### API 사용 예시
+
+#### Python 클라이언트
+```python
+import requests
+import json
+
+# 1. 동기 처리
+def estimate_mass_sync(image_path):
+    url = "http://localhost:8000/api/v1/estimate"
+    with open(image_path, 'rb') as f:
+        files = {'file': f}
+        response = requests.post(url, files=files)
+    return response.json()
+
+# 2. 비동기 처리
+def estimate_mass_async(image_path):
+    # 작업 시작
+    url = "http://localhost:8000/api/v1/estimate_async"
+    with open(image_path, 'rb') as f:
+        files = {'file': f}
+        response = requests.post(url, files=files)
+    task_id = response.json()['task_id']
+    
+    # 작업 상태 확인
+    status_url = f"http://localhost:8000/api/v1/task/{task_id}"
+    while True:
+        status_response = requests.get(status_url)
+        status_data = status_response.json()
+        
+        if status_data['status'] == 'completed':
+            return status_data['result']
+        elif status_data['status'] == 'failed':
+            raise Exception(status_data['error'])
+        
+        time.sleep(1)  # 1초 대기
+
+# 사용 예시
+result = estimate_mass_sync('data/test1.jpg')
+print(f"추정 질량: {result['mass_estimation']['estimated_mass_g']}g")
+```
+
+#### JavaScript 클라이언트
+```javascript
+// 1. 동기 처리
+async function estimateMassSync(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch('http://localhost:8000/api/v1/estimate', {
+        method: 'POST',
+        body: formData
+    });
+    
+    return await response.json();
+}
+
+// 2. 비동기 처리 + WebSocket
+async function estimateMassAsync(file) {
+    // 작업 시작
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch('http://localhost:8000/api/v1/estimate_async', {
+        method: 'POST',
+        body: formData
+    });
+    
+    const { task_id } = await response.json();
+    
+    // WebSocket 연결
+    const ws = new WebSocket(`ws://localhost:8000/api/v1/ws/task/${task_id}`);
+    
+    ws.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'task_status') {
+            console.log(`진행률: ${data.data.progress * 100}%`);
+        } else if (data.type === 'task_completed') {
+            console.log('완료!', data.data.result);
+            ws.close();
+        }
+    };
+    
+    return task_id;
+}
+
+// 사용 예시
+const fileInput = document.getElementById('fileInput');
+fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    const result = await estimateMassSync(file);
+    console.log(`추정 질량: ${result.mass_estimation.estimated_mass_g}g`);
+});
+```
+
+### API 응답 형식
+
+#### 동기 처리 응답
+```json
+{
+  "filename": "test1.jpg",
+  "detected_objects": {
+    "food": 1,
+    "reference_objects": 1
+  },
+  "mass_estimation": {
+    "estimated_mass_g": 150.5,
+    "confidence": 0.75,
+    "food_name": "김밥",
+    "verification_method": "volume_based",
+    "calculation_details": {
+      "volume_cm3": 120.3,
+      "density_g_cm3": 1.25,
+      "reference_object_used": "이어폰 케이스",
+      "pixel_to_cm_ratio": 0.05
+    }
+  }
+}
+```
+
+#### 비동기 작업 생성 응답
+```json
+{
+  "task_id": "1af8db93-c3cc-42dd-bd44-54dd68d9abc2",
+  "status": "processing",
+  "message": "작업이 시작되었습니다.",
+  "created_at": "2025-07-14T15:22:40.500031"
+}
+```
+
+#### 작업 상태 조회 응답
+```json
+{
+  "task_id": "1af8db93-c3cc-42dd-bd44-54dd68d9abc2",
+  "status": "completed",
+  "progress": 1.0,
+  "message": "작업이 완료되었습니다.",
+  "created_at": "2025-07-14T15:22:40.500031",
+  "completed_at": "2025-07-14T15:23:26.326864",
+  "result": {
+    "filename": "test1.jpg",
+    "detected_objects": {
+      "food": 1,
+      "reference_objects": 1
+    },
+    "mass_estimation": {
+      "estimated_mass_g": 150.5,
+      "confidence": 0.75,
+      "food_name": "김밥",
+      "verification_method": "volume_based"
+    }
+  }
+}
+```
+
+#### WebSocket 메시지 형식
+```json
+// 진행 상황 업데이트
+{
+  "type": "task_status",
+  "task_id": "1af8db93-c3cc-42dd-bd44-54dd68d9abc2",
+  "data": {
+    "status": "processing",
+    "progress": 0.6,
+    "message": "LLM 분석 중...",
+    "current_step": "llm_analysis"
+  }
+}
+
+// 작업 완료
+{
+  "type": "task_completed",
+  "task_id": "1af8db93-c3cc-42dd-bd44-54dd68d9abc2",
+  "data": {
+    "status": "completed",
+    "progress": 1.0,
+    "message": "작업이 완료되었습니다.",
+    "result": {
+      "filename": "test1.jpg",
+      "mass_estimation": {
+        "estimated_mass_g": 150.5,
+        "confidence": 0.75
+      }
+    }
+  }
+}
+```
+
+### CORS 설정
+API 서버는 다음 origin들을 허용합니다:
+- `http://localhost:5500` (Live Server)
+- `http://127.0.0.1:5500`
+- `http://localhost:3000`
+- `http://127.0.0.1:3000`
+- `*` (개발 환경)
+
+### 에러 처리
+```json
+{
+  "error": "파일 업로드 실패",
+  "detail": "지원하지 않는 파일 형식입니다. JPG, PNG 파일만 업로드 가능합니다.",
+  "status_code": 400
+}
+```
+
+### 성능 최적화 팁
+1. **이미지 크기**: 1920px 이하 권장
+2. **동시 요청**: 서버 리소스에 따라 제한
+3. **비동기 처리**: 대용량 이미지나 긴 처리 시간이 필요한 경우
+4. **WebSocket**: 실시간 진행 상황이 필요한 경우
+
+### WebSocket 테스트 방법
+
+#### 1. 테스트 HTML 파일 사용
+프로젝트에 포함된 `websocket_test.html` 파일을 사용하여 WebSocket 기능을 테스트할 수 있습니다.
+
+```bash
+# 1. API 서버 시작
+python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+
+# 2. Live Server로 HTML 파일 실행
+# VS Code에서 websocket_test.html 파일을 열고 "Go Live" 버튼 클릭
+# 또는 다른 로컬 서버 사용 (http://localhost:5500)
+```
+
+#### 2. 테스트 순서
+1. **브라우저에서 `http://localhost:5500/websocket_test.html` 접속**
+2. **"WebSocket 연결" 버튼 클릭** - 연결 상태 확인
+3. **"파일 선택" 버튼으로 이미지 업로드** - `data/test1.jpg` 또는 `data/test2.jpg` 사용
+4. **실시간 진행 상황 확인** - WebSocket을 통한 실시간 알림
+5. **최종 결과 확인** - 질량 추정 결과 표시
+
+#### 3. 예상 결과
+```
+[오후 4:02:07] WebSocket 연결됨
+[오후 4:02:07] 파일 업로드 시작: test1.jpg (2310742 bytes)
+[오후 4:02:08] 작업 시작됨
+[오후 4:02:09] YOLO 분석 중... (진행률: 20%)
+[오후 4:02:10] MiDaS 깊이 추정 중... (진행률: 40%)
+[오후 4:02:11] 특징 추출 중... (진행률: 60%)
+[오후 4:02:12] LLM 분석 중... (진행률: 80%)
+[오후 4:02:13] 작업 완료! 추정 질량: 150.5g
+```
+
+#### 4. 문제 해결
+- **연결 실패**: API 서버가 8000 포트에서 실행 중인지 확인
+- **파일 업로드 실패**: 이미지 파일 형식 확인 (JPG, PNG)
+- **진행 상황이 안 보임**: 브라우저 개발자 도구에서 WebSocket 연결 상태 확인
 
 ## 🔄 파이프라인 구조
 
@@ -228,22 +573,29 @@ python main.py data/test1.jpg --model gemini-1.5-pro
 - **출력**: 정규화된 깊이 맵
 - **시각화**: `results/depth_*.jpg`
 
-#### 3단계: 특징 추출
+### 3단계: 특징 추출
 - **목적**: 세그멘테이션과 깊이 정보 결합
 - **계산 내용**:
   - 픽셀 면적 → 실제 면적 변환
   - 깊이 분포 → 부피 추정
   - 기준 물체 → 스케일 보정
 
-#### 4단계: 기준 물체 분석
+### 4단계: 기준 물체 분석
 - **목적**: 실제 크기 스케일 계산
 - **지원 기준 물체**: 이어폰 케이스, 동전 등
 - **출력**: 픽셀-센티미터 변환 비율
 
-#### 5단계: LLM 질량 추정
+### 5단계: LLM 질량 추정
 - **목적**: 최종 질량 계산 및 검증
 - **입력**: 추출된 모든 특징
 - **출력**: 그램 단위 질량, 신뢰도, 추정 근거
+
+### 6단계: API 응답 생성
+- **목적**: 클라이언트에게 결과 전송
+- **형식**: JSON 응답 또는 WebSocket 실시간 알림
+- **내용**: 질량 추정 결과, 신뢰도, 처리 시간 등
+
+
 
 ## 📁 파일 구조
 
@@ -257,7 +609,7 @@ Yolo_midas/
 ├── .gitattributes        # Git LFS 설정
 ├── .gitignore            # Git 제외 파일
 ├── README.md             # 이 파일
-├── yolo_food.pt          # YOLO 모델 파일 (Git LFS)
+├── weights/yolo_food_v1.pt  # YOLO 모델 파일 (Git LFS)
 │
 ├── data/                 # 입력 데이터
 │   ├── test1.jpg         # 샘플 이미지
@@ -298,38 +650,43 @@ Yolo_midas/
 ## 📊 결과 해석
 
 ### 출력 형식
+
+#### 명령줄 실행 결과
 ```json
 {
-  "image_path": "data/test1.jpg",
-  "processing_time": 5.23,
-  "segmentation_results": {
-    "food_objects": [
-      {
-        "class_name": "food",
-        "confidence": 0.87,
-        "bbox": [100, 150, 300, 400],
-        "pixel_area": 25000
-      }
-    ],
-    "reference_objects": [
-      {
-        "class_name": "earphone_case",
-        "confidence": 0.92,
-        "bbox": [50, 50, 120, 180],
-        "pixel_area": 9100
-      }
-    ]
+  "filename": "test2.jpg",
+  "detected_objects": {
+    "food": 1,
+    "reference_objects": 1
   },
-  "initial_estimate": {
-    "estimated_mass": 120.5,
+  "mass_estimation": {
+    "estimated_mass_g": 150.5,
     "confidence": 0.75,
-    "method": "volume_based"
+    "food_name": "김밥",
+    "verification_method": "volume_based",
+    "calculation_details": {
+      "volume_cm3": 120.3,
+      "density_g_cm3": 1.25,
+      "reference_object_used": "이어폰 케이스",
+      "pixel_to_cm_ratio": 0.05
+    }
+  }
+}
+```
+
+#### API 응답 결과
+```json
+{
+  "filename": "test2.jpg",
+  "detected_objects": {
+    "food": 1,
+    "reference_objects": 1
   },
-  "final_estimate": {
-    "final_mass": 118.3,
-    "confidence": 0.82,
-    "method": "multimodal_verified",
-    "reasoning": "이어폰 케이스를 기준으로 한 스케일 보정 결과..."
+  "mass_estimation": {
+    "estimated_mass_g": 150.5,
+    "confidence": 0.75,
+    "food_name": "김밥",
+    "verification_method": "volume_based"
   }
 }
 ```
@@ -381,7 +738,7 @@ ERROR: YOLO 모델 파일이 존재하지 않습니다
 
 # 해결 방법
 1. Git LFS로 모델 파일 다운로드: git lfs pull
-2. 파일 존재 확인: ls -la yolo_food.pt
+2. 파일 존재 확인: ls -la weights/yolo_food_v1.pt
 ```
 
 #### 3. Git LFS 문제
