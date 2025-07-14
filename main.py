@@ -207,13 +207,48 @@ def main():
             if 'error' in mass_estimation:
                 print(f"LLM 추정 오류: {mass_estimation['error']}")
             else:
-                estimated_mass = mass_estimation.get('estimated_mass_g', 'N/A')
-                confidence = mass_estimation.get('confidence', 'N/A')
-                reasoning = mass_estimation.get('reasoning', 'N/A')
+                # 여러 음식 처리 결과 출력
+                if "food_estimations" in mass_estimation:
+                    print(f"감지된 음식 개수: {mass_estimation.get('food_count', 0)}개")
+                    print("\n개별 음식 분석:")
+                    
+                    for i, food_est in enumerate(mass_estimation.get('food_estimations', [])):
+                        if 'error' in food_est:
+                            print(f"  음식 {i+1}: 오류 - {food_est['error']}")
+                        else:
+                            print(f"  음식 {i+1}: {food_est.get('estimated_mass_g', 0):.1f}g (신뢰도: {food_est.get('confidence', 0):.2f})")
+                            print(f"    근거: {food_est.get('reasoning', 'N/A')}")
                 
-                print(f"추정 질량: {estimated_mass}g")
-                print(f"신뢰도: {confidence}")
-                print(f"추정 근거: {reasoning}")
+                # 멀티모달 검증 결과가 있는 경우
+                elif "food_verifications" in mass_estimation:
+                    print(f"감지된 음식 개수: {len(mass_estimation.get('food_verifications', []))}개")
+                    print("\n개별 음식 분석:")
+                    
+                    for food_ver in mass_estimation.get('food_verifications', []):
+                        print(f"  음식: {food_ver.get('food_name', '알수없음')}")
+                        print(f"    질량: {food_ver.get('verified_mass_g', 0):.1f}g")
+                        print(f"    검증 방법: {food_ver.get('verification_method', 'N/A')}")
+                        
+                        quoted_text = food_ver.get('quoted_text', {})
+                        if quoted_text.get('product_name') or quoted_text.get('weight'):
+                            print(f"    라벨 정보:")
+                            if quoted_text.get('product_name'):
+                                print(f"      제품명: {quoted_text['product_name']}")
+                            if quoted_text.get('weight'):
+                                print(f"      중량: {quoted_text['weight']}")
+                        
+                        print(f"    근거: {food_ver.get('reasoning', 'N/A')}")
+                        print()
+                
+                # 기존 단일 음식 결과 (하위 호환성)
+                else:
+                    estimated_mass = mass_estimation.get('estimated_mass_g', 'N/A')
+                    confidence = mass_estimation.get('confidence', 'N/A')
+                    reasoning = mass_estimation.get('reasoning', 'N/A')
+                    
+                    print(f"추정 질량: {estimated_mass}g")
+                    print(f"신뢰도: {confidence}")
+                    print(f"추정 근거: {reasoning}")
             
             # 결과 파일 저장
             if args.output:
