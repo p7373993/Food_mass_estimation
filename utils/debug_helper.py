@@ -279,12 +279,12 @@ class DebugHelper:
             print(f"        깊이 - 평균: {depth_info.get('mean_depth', 0):.3f}, 변화: {depth_info.get('depth_variation', 0):.3f}")
             print(f"        실제 크기: {ref.get('real_size', {})}")
     
-    def log_initial_mass_calculation_debug(self, features: Dict, prompt: str, response: str, parsed_result: Dict):
+    def log_initial_mass_calculation_debug(self, features: Dict, prompt: str, response: str, parsed_result: Dict, food_index: int = 0):
         """초기 질량 측정 과정을 상세히 디버그 출력합니다."""
         if not self.enable_debug:
             return
             
-        print(f"\n🔬 초기 질량 측정 과정 상세 분석:")
+        print(f"\n🔬 음식 {food_index + 1} 초기 질량 측정 과정 상세 분석:")
         print(f"{'='*60}")
         
         # 1. 입력 데이터 분석
@@ -293,11 +293,13 @@ class DebugHelper:
         depth_scale_info = features.get("depth_scale_info", {})
         
         print(f"📊 입력 데이터 분석:")
-        if food_objects:
-            food = food_objects[0]
-            print(f"   🍽️ 음식 정보:")
+        if food_objects and food_index < len(food_objects):
+            food = food_objects[food_index]
+            print(f"   🍽️ 음식 {food_index + 1} 정보:")
             print(f"      - 종류: {food.get('class_name', 'unknown')}")
             print(f"      - 픽셀 면적: {food.get('pixel_area', 0):,}픽셀")
+            print(f"      - 신뢰도: {food.get('confidence', 0):.3f}")
+            print(f"      - 위치: {food.get('bbox', [])}")
             
             # 깊이 정보
             depth_info = food.get('depth_info', {})
@@ -314,6 +316,13 @@ class DebugHelper:
             ref = reference_objects[0]
             print(f"   📏 기준 물체:")
             print(f"      - 종류: {ref.get('class_name', 'unknown')}")
+            print(f"      - 픽셀 면적: {ref.get('pixel_area', 0):,}픽셀")
+            
+            # 기준 물체의 깊이 정보
+            ref_depth_info = ref.get('depth_info', {})
+            print(f"      - 평균 깊이: {ref_depth_info.get('mean_depth', 0):.3f}")
+            print(f"      - 깊이 변화량: {ref_depth_info.get('depth_variation', 0):.3f}")
+            
             real_size = ref.get('real_size', {})
             if real_size:
                 print(f"      - 실제 크기: {real_size.get('width', 0):.1f}cm × {real_size.get('height', 0):.1f}cm")

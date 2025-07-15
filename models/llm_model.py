@@ -38,29 +38,42 @@ class LLMMassEstimator(BaseModel):
         
         food_objects = features.get("food_objects", [])
         if not food_objects:
-            return {"error": "음식 객체가 감지되지 않았습니다."}
+            # 음식 객체가 없으면 빈 결과 반환 (멀티모달에서 처리)
+            return {
+                "food_estimations": [],
+                "food_count": 0,
+                "no_food_detected": True
+            }
         
         # 여러 음식에 대해 각각 질량 추정
         food_estimations = []
         
+        logging.info(f"총 {len(food_objects)}개의 음식 객체에 대해 질량 추정을 시작합니다.")
+        
         for i, food in enumerate(food_objects):
+            logging.info(f"음식 {i+1}/{len(food_objects)} 처리 중: 픽셀 면적 {food.get('pixel_area', 0):,}, 신뢰도 {food.get('confidence', 0):.3f}, bbox {food.get('bbox', [])}")
+            
             prompt = self._build_prompt_for_food(features, food, i)
             try:
                 response = self._model.generate_content(
                     prompt,
                     generation_config=genai.types.GenerationConfig(
-                        temperature=settings.LLM_TEMPERATURE, top_p=settings.LLM_TOP_P
+                        temperature=settings.LLM_TEMPERATURE, 
+                        top_p=settings.LLM_TOP_P,
+                        candidate_count=1  # 완전히 결정론적
                     ),
                 )
                 mass_info = self._parse_response(response.text)
                 if debug_helper:
-                    debug_helper.log_initial_mass_calculation_debug(features, prompt, response.text, mass_info)
+                    debug_helper.log_initial_mass_calculation_debug(features, prompt, response.text, mass_info, food_index=i)
                 
                 # 음식별 정보 추가
                 mass_info["food_index"] = i
                 mass_info["food_bbox"] = food.get("bbox", [])
                 mass_info["food_pixel_area"] = food.get("pixel_area", 0)
                 food_estimations.append(mass_info)
+                
+                logging.info(f"음식 {i+1} 질량 추정 완료: {mass_info.get('estimated_mass_g', 0):.1f}g")
                     
             except Exception as e:
                 logging.error(f"음식 {i} 질량 추정 중 오류 발생: {e}")
@@ -127,7 +140,9 @@ class LLMMassEstimator(BaseModel):
             response = multimodal_model.generate_content(
                 multimodal_content,
                 generation_config=genai.types.GenerationConfig(
-                    temperature=settings.LLM_TEMPERATURE, top_p=settings.LLM_TOP_P
+                    temperature=settings.LLM_TEMPERATURE, 
+                    top_p=settings.LLM_TOP_P,
+                    candidate_count=1  # 완전히 결정론적
                 ),
             )
             
@@ -135,7 +150,7 @@ class LLMMassEstimator(BaseModel):
                 print(f"   LLM 응답 길이: {len(response.text)} 문자")
                 print(f"   LLM 응답 미리보기: {response.text[:200]}...")
             
-            return self._parse_multimodal_response(response.text, initial_estimation)
+            return self._parse_multimodal_response(response.text, initial_estimation, features)
         except Exception as e:
             logging.error(f"멀티모달 검증 중 오류 발생: {e}")
             return {"error": str(e)}
@@ -227,18 +242,42 @@ class LLMMassEstimator(BaseModel):
     def _build_multimodal_prompt(self, initial_estimation: dict, features: dict) -> str:
         food_objects = features.get("food_objects", [])
         food_count = len(food_objects)
+        no_food_detected = initial_estimation.get("no_food_detected", False)
+        
+        # 기준물체 신뢰도 정보 추출
+        reference_objects = features.get("reference_objects", [])
+        reference_confidence = 0.0
+        reference_info = ""
+        
+        if reference_objects:
+            ref_obj = reference_objects[0]
+            reference_confidence = ref_obj.get("confidence", 0.0)
+            reference_info = f"- 기준물체: {ref_obj.get('class_name', '알수없음')} (신뢰도: {reference_confidence:.2f})\n"
+        else:
+            reference_info = "- 기준물체: 없음 (신뢰도: 0.0)\n"
         
         prompt = f"""
 음식 질량 추정 멀티모달 검증:
 
 📊 초기 추정 정보:
 - 감지된 음식 개수: {food_count}개
+{reference_info}
 """
         
-        if "food_estimations" in initial_estimation:
+        if no_food_detected:
+            prompt += "- YOLO 모델이 음식을 감지하지 못했습니다. 멀티모달 검증으로 최종 판단합니다.\n"
+        elif "food_estimations" in initial_estimation:
             for i, est in enumerate(initial_estimation["food_estimations"]):
                 if "error" not in est:
                     prompt += f"- 음식 {i+1} 초기 추정 질량: {est.get('estimated_mass_g', 0):.1f}g\n"
+
+        # 기준물체 신뢰도가 낮을 때 멀티모달에게 더 큰 권한 부여
+        if reference_confidence < 0.5:
+            prompt += f"""
+⚠️ 중요: 기준물체 신뢰도가 낮습니다 ({reference_confidence:.2f}). 
+이 경우 초기 추정 질량보다 멀티모달의 시각적 판단을 우선시하세요.
+초기 추정이 과대 추정된 것 같다면 질량을 줄이고, 과소 추정된 것 같다면 질량을 늘리세요.
+"""
 
         prompt += f"""
 🔍 검증 과제:
@@ -247,6 +286,7 @@ class LLMMassEstimator(BaseModel):
 1.  **1차 시각적 식별**:
     - 이미지에 보이는 모든 음식 물체를 있는 그대로 설명하세요
     - 음식이 여러 개 있다면 각각을 구분하여 설명하세요
+    - 음식이 보이지 않는다면 "음식이 없음"이라고 명시하세요
 
 2.  **재검토 및 최종 판단**:
     - 1차 식별 결과에 대해 다른 가능성은 없는지 비판적으로 검토하세요.
@@ -254,6 +294,13 @@ class LLMMassEstimator(BaseModel):
 
 3.  **라벨 텍스트 분석**:
     - 라벨이 보이면, 제품명과 중량(g 또는 ml)을 **보이는 그대로 인용**하세요.
+
+4.  **질량 조정 (기준물체 신뢰도가 낮을 때)**:
+    - 초기 추정 질량이 현실적으로 보이는지 검토하세요
+    - "좀 많다", "과대 추정", "너무 크다" 등의 표현이 있다면 질량을 줄이세요
+    - "좀 적다", "과소 추정", "너무 작다" 등의 표현이 있다면 질량을 늘리세요
+    - 조정 비율은 보통 10-30% 정도가 적절합니다
+    - **중요**: 조정한 최종 질량을 "verified_mass_g" 필드에 정확히 입력하세요
 
 📋 응답 형식 (JSON):
 {{
@@ -275,21 +322,27 @@ class LLMMassEstimator(BaseModel):
 """
         return prompt.strip()
 
-    def _parse_multimodal_response(self, response_text: str, initial_estimation: dict) -> dict:
+    def _parse_multimodal_response(self, response_text: str, initial_estimation: dict, features: dict) -> dict:
         try:
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if json_match:
                 parsed = json.loads(json_match.group())
-                return self._process_parsed_multimodal_response(parsed, initial_estimation)
+                return self._process_parsed_multimodal_response(parsed, initial_estimation, features)
             else:
                 raise ValueError("JSON 응답을 찾을 수 없습니다.")
         except Exception as e:
             logging.error(f"멀티모달 응답 파싱 및 처리 오류: {e}")
             return {"error": f"멀티모달 검증 실패: {e}", "confidence": 0.1, "estimated_mass_g": initial_estimation.get('estimated_mass_g', 0)}
 
-    def _process_parsed_multimodal_response(self, parsed: dict, initial_estimation: dict) -> dict:
+    def _process_parsed_multimodal_response(self, parsed: dict, initial_estimation: dict, features: dict) -> dict:
         foods = parsed.get('foods', [])
         food_verifications = []
+        
+        # 기준물체 신뢰도 정보 추출
+        reference_confidence = 0.0
+        reference_objects = features.get("reference_objects", [])
+        if reference_objects:
+            reference_confidence = reference_objects[0].get("confidence", 0.0)
         
         for i, food_info in enumerate(foods):
             food_name = food_info.get('food_name', '알수없음')
@@ -313,8 +366,45 @@ class LLMMassEstimator(BaseModel):
 
             # 2. 라벨 정보가 없으면, LLM의 시각적 판단에 의존
             if final_mass is None:
+                # 멀티모달이 제안한 질량을 우선 사용
                 final_mass = food_info.get('verified_mass_g', 0)
-                logging.info(f"시각적 추정 기반 질량: {final_mass}g")
+                logging.info(f"멀티모달 제안 질량: {final_mass}g")
+                
+                # 3. 기준물체 신뢰도가 낮을 때 멀티모달 피드백 강화
+                if reference_confidence < 0.5:
+                    # 초기 추정 질량과 비교하여 조정
+                    initial_mass = 0
+                    if "food_estimations" in initial_estimation and i < len(initial_estimation["food_estimations"]):
+                        initial_mass = initial_estimation["food_estimations"][i].get("estimated_mass_g", 0)
+                    
+                    if initial_mass > 0:
+                        # 멀티모달이 reasoning에서 조정된 질량을 명시했는지 확인
+                        reasoning_lower = reasoning.lower()
+                        
+                        # "Xg으로 조정" 패턴 찾기
+                        adjustment_match = re.search(r'(\d+(?:\.\d+)?)g\s*으로\s*조정', reasoning)
+                        if adjustment_match:
+                            adjusted_mass = float(adjustment_match.group(1))
+                            final_mass = adjusted_mass
+                            logging.info(f"기준물체 신뢰도 낮음: 멀티모달이 명시한 조정값 사용 {initial_mass:.1f}g → {final_mass:.1f}g")
+                            verification_method = "multimodal_adjusted"
+                        # 키워드 기반 자동 조정 (멀티모달이 명시하지 않은 경우)
+                        elif any(keyword in reasoning_lower for keyword in ["좀 많", "과대", "너무 크", "많이", "큰 편"]):
+                            # 질량을 20-30% 줄임
+                            reduction_factor = 0.75  # 25% 감소
+                            final_mass = initial_mass * reduction_factor
+                            logging.info(f"기준물체 신뢰도 낮음: 키워드 기반 질량 조정 {initial_mass:.1f}g → {final_mass:.1f}g (25% 감소)")
+                            verification_method = "multimodal_adjusted"
+                        elif any(keyword in reasoning_lower for keyword in ["좀 적", "과소", "너무 작", "적게", "작은 편"]):
+                            # 질량을 20-30% 늘림
+                            increase_factor = 1.25  # 25% 증가
+                            final_mass = initial_mass * increase_factor
+                            logging.info(f"기준물체 신뢰도 낮음: 키워드 기반 질량 조정 {initial_mass:.1f}g → {final_mass:.1f}g (25% 증가)")
+                            verification_method = "multimodal_adjusted"
+                        else:
+                            # 피드백이 없으면 멀티모달 추정값 사용
+                            logging.info(f"기준물체 신뢰도 낮음: 멀티모달 추정값 사용 {final_mass:.1f}g")
+                            verification_method = "multimodal_estimation"
             
             food_verifications.append({
                 "food_index": i,

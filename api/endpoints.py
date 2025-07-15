@@ -161,30 +161,53 @@ async def estimate_mass(
         simplified_mass_estimation = {}
         
         if "food_verifications" in mass_estimation and mass_estimation["food_verifications"]:
-            # 멀티모달 검증 결과가 있는 경우
-            food_ver = mass_estimation["food_verifications"][0]
+            # 멀티모달 검증 결과가 있는 경우 - 모든 음식 반환
+            food_verifications = mass_estimation["food_verifications"]
             simplified_mass_estimation = {
-                "estimated_mass_g": food_ver.get("verified_mass_g"),
-                "confidence": food_ver.get("confidence"),
-                "food_name": food_ver.get("food_name"),
-                "verification_method": food_ver.get("verification_method")
+                "foods": [
+                    {
+                        "food_name": food_ver.get("food_name"),
+                        "estimated_mass_g": food_ver.get("verified_mass_g"),
+                        "confidence": food_ver.get("confidence"),
+                        "verification_method": food_ver.get("verification_method"),
+                        "reasoning": food_ver.get("reasoning", "")
+                    }
+                    for food_ver in food_verifications
+                ],
+                "total_mass_g": sum(food_ver.get("verified_mass_g", 0) for food_ver in food_verifications),
+                "food_count": len(food_verifications)
             }
         elif "food_estimations" in mass_estimation and mass_estimation["food_estimations"]:
-            # 초기 추정 결과가 있는 경우
-            food_est = mass_estimation["food_estimations"][0]
+            # 초기 추정 결과가 있는 경우 - 모든 음식 반환
+            food_estimations = mass_estimation["food_estimations"]
             simplified_mass_estimation = {
-                "estimated_mass_g": food_est.get("estimated_mass_g"),
-                "confidence": food_est.get("confidence"),
-                "food_name": food_est.get("food_name", "알수없음"),
-                "verification_method": "initial_estimation"
+                "foods": [
+                    {
+                        "food_name": food_est.get("food_name", "알수없음"),
+                        "estimated_mass_g": food_est.get("estimated_mass_g"),
+                        "confidence": food_est.get("confidence"),
+                        "verification_method": "initial_estimation",
+                        "reasoning": food_est.get("reasoning", "")
+                    }
+                    for food_est in food_estimations
+                ],
+                "total_mass_g": sum(food_est.get("estimated_mass_g", 0) for food_est in food_estimations),
+                "food_count": len(food_estimations)
             }
         else:
             # 기존 단일 결과 (하위 호환성)
             simplified_mass_estimation = {
-                "estimated_mass_g": mass_estimation.get("estimated_mass_g"),
-                "confidence": mass_estimation.get("confidence"),
-                "food_name": "알수없음",
-                "verification_method": "basic_estimation"
+                "foods": [
+                    {
+                        "food_name": "알수없음",
+                        "estimated_mass_g": mass_estimation.get("estimated_mass_g"),
+                        "confidence": mass_estimation.get("confidence"),
+                        "verification_method": "basic_estimation",
+                        "reasoning": mass_estimation.get("reasoning", "")
+                    }
+                ],
+                "total_mass_g": mass_estimation.get("estimated_mass_g", 0),
+                "food_count": 1
             }
 
         # 디버그 모드에서 간소화된 결과 로깅
@@ -417,30 +440,53 @@ async def process_estimation_task(task_id: str, file_contents: bytes, filename: 
         simplified_mass_estimation = {}
         
         if "food_verifications" in mass_estimation and mass_estimation["food_verifications"]:
-            # 멀티모달 검증 결과가 있는 경우
-            food_ver = mass_estimation["food_verifications"][0]
+            # 멀티모달 검증 결과가 있는 경우 - 모든 음식 반환
+            food_verifications = mass_estimation["food_verifications"]
             simplified_mass_estimation = {
-                "estimated_mass_g": food_ver.get("verified_mass_g"),
-                "confidence": food_ver.get("confidence"),
-                "food_name": food_ver.get("food_name"),
-                "verification_method": food_ver.get("verification_method")
+                "foods": [
+                    {
+                        "food_name": food_ver.get("food_name"),
+                        "estimated_mass_g": food_ver.get("verified_mass_g"),
+                        "confidence": food_ver.get("confidence"),
+                        "verification_method": food_ver.get("verification_method"),
+                        "reasoning": food_ver.get("reasoning", "")
+                    }
+                    for food_ver in food_verifications
+                ],
+                "total_mass_g": sum(food_ver.get("verified_mass_g", 0) for food_ver in food_verifications),
+                "food_count": len(food_verifications)
             }
         elif "food_estimations" in mass_estimation and mass_estimation["food_estimations"]:
-            # 초기 추정 결과가 있는 경우
-            food_est = mass_estimation["food_estimations"][0]
+            # 초기 추정 결과가 있는 경우 - 모든 음식 반환
+            food_estimations = mass_estimation["food_estimations"]
             simplified_mass_estimation = {
-                "estimated_mass_g": food_est.get("estimated_mass_g"),
-                "confidence": food_est.get("confidence"),
-                "food_name": food_est.get("food_name", "알수없음"),
-                "verification_method": "initial_estimation"
+                "foods": [
+                    {
+                        "food_name": food_est.get("food_name", "알수없음"),
+                        "estimated_mass_g": food_est.get("estimated_mass_g"),
+                        "confidence": food_est.get("confidence"),
+                        "verification_method": "initial_estimation",
+                        "reasoning": food_est.get("reasoning", "")
+                    }
+                    for food_est in food_estimations
+                ],
+                "total_mass_g": sum(food_est.get("estimated_mass_g", 0) for food_est in food_estimations),
+                "food_count": len(food_estimations)
             }
         else:
             # 기존 단일 결과 (하위 호환성)
             simplified_mass_estimation = {
-                "estimated_mass_g": mass_estimation.get("estimated_mass_g"),
-                "confidence": mass_estimation.get("confidence"),
-                "food_name": "알수없음",
-                "verification_method": "basic_estimation"
+                "foods": [
+                    {
+                        "food_name": "알수없음",
+                        "estimated_mass_g": mass_estimation.get("estimated_mass_g"),
+                        "confidence": mass_estimation.get("confidence"),
+                        "verification_method": "basic_estimation",
+                        "reasoning": mass_estimation.get("reasoning", "")
+                    }
+                ],
+                "total_mass_g": mass_estimation.get("estimated_mass_g", 0),
+                "food_count": 1
             }
 
         # 최종 응답 생성

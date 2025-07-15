@@ -59,10 +59,11 @@ class MassEstimationService:
             # 시각화 추가
             debug_helper.save_segmentation_visualization(image, segmentation_results)
             
-            # 객체 감지 실패 시 파이프라인 중단
+            # 음식 객체가 없어도 파이프라인 계속 진행 (멀티모달이 최종 판단)
             if not segmentation_results.get("food_objects"):
-                logging.warning("음식 객체를 감지하지 못했습니다.")
-                raise ValueError("음식 객체를 찾을 수 없습니다.")
+                logging.warning("음식 객체를 감지하지 못했습니다. 멀티모달 검증으로 진행합니다.")
+                # 빈 음식 객체 리스트로 초기화하여 파이프라인 계속 진행
+                segmentation_results["food_objects"] = []
 
             # 2단계: MiDaS 깊이 추정
             logging.info("2단계: MiDaS 깊이 추정 실행")
@@ -89,7 +90,7 @@ class MassEstimationService:
             debug_helper.log_step_end("LLM 질량 추정")
 
             # 5단계: 멀티모달 검증 (설정에 따라 선택적 실행)
-            if settings.ENABLE_MULTIMODAL and not estimated_result.get("error"):
+            if settings.ENABLE_MULTIMODAL and (not estimated_result.get("error") or estimated_result.get("no_food_detected")):
                 logging.info("5단계: 멀티모달 검증 실행")
                 verification_result = self.llm_estimator.verify_mass_with_multimodal(
                     image, estimated_result, features
