@@ -366,46 +366,22 @@ class LLMMassEstimator(BaseModel):
 
             # 2. 라벨 정보가 없으면, LLM의 시각적 판단에 의존
             if final_mass is None:
-                # 멀티모달이 제안한 질량을 우선 사용
-                final_mass = food_info.get('verified_mass_g', 0)
-                logging.info(f"멀티모달 제안 질량: {final_mass}g")
-                
-                # 3. 기준물체 신뢰도가 낮을 때 멀티모달 피드백 강화
-                if reference_confidence < 0.5:
-                    # 초기 추정 질량과 비교하여 조정
-                    initial_mass = 0
-                    if "food_estimations" in initial_estimation and i < len(initial_estimation["food_estimations"]):
-                        initial_mass = initial_estimation["food_estimations"][i].get("estimated_mass_g", 0)
-                    
-                    if initial_mass > 0:
-                        # 멀티모달이 reasoning에서 조정된 질량을 명시했는지 확인
-                        reasoning_lower = reasoning.lower()
-                        
-                        # "Xg으로 조정" 패턴 찾기
-                        adjustment_match = re.search(r'(\d+(?:\.\d+)?)g\s*으로\s*조정', reasoning)
-                        if adjustment_match:
-                            adjusted_mass = float(adjustment_match.group(1))
-                            final_mass = adjusted_mass
-                            logging.info(f"기준물체 신뢰도 낮음: 멀티모달이 명시한 조정값 사용 {initial_mass:.1f}g → {final_mass:.1f}g")
-                            verification_method = "multimodal_adjusted"
-                        # 키워드 기반 자동 조정 (멀티모달이 명시하지 않은 경우)
-                        elif any(keyword in reasoning_lower for keyword in ["좀 많", "과대", "너무 크", "많이", "큰 편"]):
-                            # 질량을 20-30% 줄임
-                            reduction_factor = 0.75  # 25% 감소
-                            final_mass = initial_mass * reduction_factor
-                            logging.info(f"기준물체 신뢰도 낮음: 키워드 기반 질량 조정 {initial_mass:.1f}g → {final_mass:.1f}g (25% 감소)")
-                            verification_method = "multimodal_adjusted"
-                        elif any(keyword in reasoning_lower for keyword in ["좀 적", "과소", "너무 작", "적게", "작은 편"]):
-                            # 질량을 20-30% 늘림
-                            increase_factor = 1.25  # 25% 증가
-                            final_mass = initial_mass * increase_factor
-                            logging.info(f"기준물체 신뢰도 낮음: 키워드 기반 질량 조정 {initial_mass:.1f}g → {final_mass:.1f}g (25% 증가)")
-                            verification_method = "multimodal_adjusted"
-                        else:
-                            # 피드백이 없으면 멀티모달 추정값 사용
-                            logging.info(f"기준물체 신뢰도 낮음: 멀티모달 추정값 사용 {final_mass:.1f}g")
-                            verification_method = "multimodal_estimation"
-            
+                multimodal_mass = food_info.get('verified_mass_g', 0)
+                initial_mass = 0
+                if "food_estimations" in initial_estimation and i < len(initial_estimation["food_estimations"]):
+                    initial_mass = initial_estimation["food_estimations"][i].get("estimated_mass_g", 0)
+
+                # 기준 객체 신뢰도가 높을 때 가중 평균 적용
+                if reference_confidence >= 0.5 and initial_mass > 0 and multimodal_mass > 0:
+                    final_mass = initial_mass * 0.7 + multimodal_mass * 0.3
+                    verification_method = "weighted_average"
+                    logging.info(f"기준물체 신뢰도 높음: 가중 평균 적용 {initial_mass:.1f}g(70%) + {multimodal_mass:.1f}g(30%) = {final_mass:.1f}g")
+                else:
+                    # 기존 로직 유지 (신뢰도 낮을 때)
+                    final_mass = multimodal_mass
+                    verification_method = "multimodal_estimation"
+                    logging.info(f"기준물체 신뢰도 낮음: 멀티모달 추정값 사용 {final_mass:.1f}g")
+
             food_verifications.append({
                 "food_index": i,
                 "food_name": food_name,
