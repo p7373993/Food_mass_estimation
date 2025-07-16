@@ -10,6 +10,7 @@
 - [설치 방법](#-설치-방법)
 - [설정 방법](#-설정-방법)
 - [사용 방법](#-사용-방법)
+- [🐳 Docker로 쉽게 실행하기](#-docker로-쉽게-실행하기-초심자용)
 - [API 서버 및 WebSocket](#-api-서버-및-websocket)
 - [파이프라인 구조](#-파이프라인-구조)
 - [파일 구조](#-파일-구조)
@@ -241,6 +242,74 @@ python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8001
 #### API 문서
 - Swagger UI: http://localhost:8001/docs
 - ReDoc: http://localhost:8001/redoc
+
+## 🐳 Docker로 ML 서버 실행하기 (최신)
+
+### 1. Docker와 docker-compose 설치
+- Windows/Mac: [Docker Desktop](https://www.docker.com/products/docker-desktop/) 설치
+- Linux: `sudo apt install docker.io docker-compose`
+
+### 2. .env 파일 준비
+프로젝트 루트에 아래와 같이 `.env` 파일을 만듭니다:
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+DEBUG_MODE=false
+ENABLE_MULTIMODAL=true
+LLM_PROVIDER=gemini
+LLM_MODEL_NAME=gemini-2.5-flash
+```
+
+### 3. Docker 이미지 빌드
+```bash
+./scripts/docker-build.sh build
+```
+또는 직접:
+```bash
+docker build -t food-calorie-ml-server:latest .
+```
+
+### 4. 컨테이너 실행
+```bash
+./scripts/docker-build.sh run
+```
+또는 직접:
+```bash
+docker run -d --name food-calorie-ml-server -p 8001:8001 --env-file .env food-calorie-ml-server:latest
+```
+
+### 5. 서버 접속 및 관리
+- API 문서: http://localhost:8001/docs
+- 서버 상태: http://localhost:8001/health
+
+#### 컨테이너 관리 명령어
+```bash
+# 중지
+./scripts/docker-build.sh stop
+# 재시작
+./scripts/docker-build.sh restart
+# 로그 확인
+./scripts/docker-build.sh logs
+# 상태 확인
+./scripts/docker-build.sh status
+```
+
+### 6. 개발/운영/프록시 모드 (선택)
+```bash
+# 개발 모드(코드 변경 실시간 반영)
+./scripts/docker-build.sh dev
+# 운영 모드(docker-compose.prod.yml 사용)
+./scripts/docker-build.sh prod
+# Nginx 프록시와 함께 운영
+./scripts/docker-build.sh nginx
+```
+
+---
+
+> 위 단계만 따라하면 누구나 쉽게 ML 서버를 Docker로 실행할 수 있습니다!
+> 추가적인 Docker 명령어, 문제 해결, 업데이트 방법 등은 기존 README의 "문제 해결" 및 "업데이트 방법" 섹션을 참고하세요.
+
+---
 
 ## 🌐 API 서버 및 WebSocket
 

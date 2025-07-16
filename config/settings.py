@@ -16,8 +16,7 @@ dotenv_path = Path(__file__).parent.parent / '.env'
 if dotenv_path.exists():
     load_dotenv(dotenv_path=dotenv_path, override=True)
     print(f"✅ .env 파일을 명시적으로 로드했습니다: {dotenv_path}")
-else:
-    print(f"⚠️ .env 파일이 존재하지 않아 로드하지 않았습니다. 환경 변수를 직접 사용합니다.")
+# else 블록 제거: .env 파일이 없을 때는 아무 메시지도 출력하지 않음
 
 
 class Settings(BaseSettings):
