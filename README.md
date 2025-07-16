@@ -235,22 +235,22 @@ python main.py data/test1.jpg --model gemini-1.5-pro
 
 #### 서버 시작
 ```bash
-python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
 #### API 문서
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: http://localhost:8001/docs
+- ReDoc: http://localhost:8001/redoc
 
 ## 🌐 API 서버 및 WebSocket
 
 ### 서버 실행
 ```bash
 # 개발 모드 (자동 재시작)
-python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8001
 
 # 프로덕션 모드
-python -m uvicorn api.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8001
 ```
 
 ### 사용 가능한 엔드포인트
@@ -310,7 +310,7 @@ import json
 
 # 1. 동기 처리
 def estimate_mass_sync(image_path):
-    url = "http://localhost:8000/api/v1/estimate"
+    url = "http://localhost:8001/api/v1/estimate"
     with open(image_path, 'rb') as f:
         files = {'file': f}
         response = requests.post(url, files=files)
@@ -319,14 +319,14 @@ def estimate_mass_sync(image_path):
 # 2. 비동기 처리
 def estimate_mass_async(image_path):
     # 작업 시작
-    url = "http://localhost:8000/api/v1/estimate_async"
+    url = "http://localhost:8001/api/v1/estimate_async"
     with open(image_path, 'rb') as f:
         files = {'file': f}
         response = requests.post(url, files=files)
     task_id = response.json()['task_id']
     
     # 작업 상태 확인
-    status_url = f"http://localhost:8000/api/v1/task/{task_id}"
+    status_url = f"http://localhost:8001/api/v1/task/{task_id}"
     while True:
         status_response = requests.get(status_url)
         status_data = status_response.json()
@@ -350,7 +350,7 @@ async function estimateMassSync(file) {
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await fetch('http://localhost:8000/api/v1/estimate', {
+    const response = await fetch('http://localhost:8001/api/v1/estimate', {
         method: 'POST',
         body: formData
     });
@@ -364,7 +364,7 @@ async function estimateMassAsync(file) {
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await fetch('http://localhost:8000/api/v1/estimate_async', {
+    const response = await fetch('http://localhost:8001/api/v1/estimate_async', {
         method: 'POST',
         body: formData
     });
@@ -372,7 +372,7 @@ async function estimateMassAsync(file) {
     const { task_id } = await response.json();
     
     // WebSocket 연결
-    const ws = new WebSocket(`ws://localhost:8000/api/v1/ws/task/${task_id}`);
+    const ws = new WebSocket(`ws://localhost:8001/api/v1/ws/task/${task_id}`);
     
     ws.onmessage = function(event) {
         const data = JSON.parse(event.data);
@@ -520,7 +520,7 @@ API 서버는 다음 origin들을 허용합니다:
 
 ```bash
 # 1. API 서버 시작
-python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8001
 
 # 2. Live Server로 HTML 파일 실행
 # VS Code에서 websocket_test.html 파일을 열고 "Go Live" 버튼 클릭
@@ -547,7 +547,7 @@ python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 #### 4. 문제 해결
-- **연결 실패**: API 서버가 8000 포트에서 실행 중인지 확인
+- **연결 실패**: API 서버가 8001 포트에서 실행 중인지 확인
 - **파일 업로드 실패**: 이미지 파일 형식 확인 (JPG, PNG)
 - **진행 상황이 안 보임**: 브라우저 개발자 도구에서 WebSocket 연결 상태 확인
 

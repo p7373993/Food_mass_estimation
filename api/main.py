@@ -54,6 +54,8 @@ app.add_middleware(
         "http://127.0.0.1:5500",  # Live Server (IP)
         "http://localhost:3000",  # 다른 개발 서버
         "http://127.0.0.1:3000",  # 다른 개발 서버 (IP)
+        "http://localhost:8000",  # 백앤드 서버 (IP)
+        "http://127.0.0.1:8000",  #  서버 (IP)
         "*"  # 개발 환경에서는 모든 origin 허용
     ],
     allow_credentials=True,

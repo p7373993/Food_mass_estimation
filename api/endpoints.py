@@ -103,11 +103,29 @@ async def estimate_mass(
     """
     이미지 파일을 받아 질량 추정 파이프라인을 실행하고 결과를 반환합니다.
     """
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="업로드된 파일이 이미지 형식이 아닙니다.",
-        )
+    # 디버깅을 위한 파일 정보 로깅
+    if settings.DEBUG_MODE:
+        logging.info(f"파일 업로드 정보:")
+        logging.info(f"  - filename: {file.filename}")
+        logging.info(f"  - content_type: {file.content_type}")
+        logging.info(f"  - size: {file.size if hasattr(file, 'size') else 'unknown'}")
+    
+    # 파일 타입 검증 (content_type이 None일 수 있으므로 안전하게 처리)
+    if not file.content_type or not file.content_type.startswith("image/"):
+        # 파일 확장자로도 확인
+        if file.filename:
+            file_extension = file.filename.lower().split('.')[-1]
+            allowed_extensions = ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp']
+            if file_extension not in allowed_extensions:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"지원하지 않는 파일 형식입니다. 지원 형식: {', '.join(allowed_extensions)}",
+                )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="업로드된 파일이 이미지 형식이 아닙니다. Content-Type을 확인해주세요.",
+            )
 
     try:
         # 비동기적으로 파일 읽기
@@ -248,11 +266,29 @@ async def estimate_mass_async(
 ):
     """비동기적으로 질량 추정 작업을 시작합니다."""
     try:
-        if not file.content_type.startswith("image/"):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="업로드된 파일이 이미지 형식이 아닙니다.",
-            )
+        # 디버깅을 위한 파일 정보 로깅
+        if settings.DEBUG_MODE:
+            logging.info(f"비동기 파일 업로드 정보:")
+            logging.info(f"  - filename: {file.filename}")
+            logging.info(f"  - content_type: {file.content_type}")
+            logging.info(f"  - size: {file.size if hasattr(file, 'size') else 'unknown'}")
+        
+        # 파일 타입 검증 (content_type이 None일 수 있으므로 안전하게 처리)
+        if not file.content_type or not file.content_type.startswith("image/"):
+            # 파일 확장자로도 확인
+            if file.filename:
+                file_extension = file.filename.lower().split('.')[-1]
+                allowed_extensions = ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp']
+                if file_extension not in allowed_extensions:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"지원하지 않는 파일 형식입니다. 지원 형식: {', '.join(allowed_extensions)}",
+                    )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="업로드된 파일이 이미지 형식이 아닙니다. Content-Type을 확인해주세요.",
+                )
 
         task_id = str(uuid.uuid4())
         
