@@ -1,0 +1,64 @@
+# Git 관련
+.git
+.gitignore
+.gitattributes
+
+# Python 관련
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# 개발 환경
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS 관련
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 문서 및 기타
+README.md
+*.md
+docs/
+tests/
+test_*.py
+*_test.py
+
+# 로그 및 결과 파일 (컨테이너 내에서 생성됨)
+logs/*.log
+results/*.jpg
+results/*.json
+
+# 환경 변수 파일 (런타임에 주입)
+.env
+.env.local
+.env.production
+
+# 임시 파일
+*.tmp
+*.temp 
